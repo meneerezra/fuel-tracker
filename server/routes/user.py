@@ -32,8 +32,8 @@ class UserOut(BaseModel):
     id: int | None = None
     auth_token: int
     is_superuser: bool
-    cars: list[CarOut] = Field(default_factory=list)
-    owned_cars: list[CarOut] = Field(default_factory=list)
+    cars: list[CarOut] 
+    owned_cars: list[CarOut] 
 
 @router.get("/me", response_model=UserOut)
 def view_current_user(
