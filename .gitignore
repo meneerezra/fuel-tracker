@@ -1,2 +1,6 @@
 .env
 .DS_STORE
+/server/__pycache__
+/server/database.db
+/server/models/__pycache__
+/server/routes/__pycache__
