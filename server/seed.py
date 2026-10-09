@@ -38,6 +38,7 @@ def seed() -> None:
         for n in range(USERS):
             user = create_user_with_sixteen_digit_auth_token()
             user.is_superuser = n == 0
+            user.name = "bert"
             session.add(user)
             session.flush()  # need the generated id before it can be an owner_id
             users.append(user)

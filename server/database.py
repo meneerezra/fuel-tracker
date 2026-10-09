@@ -67,5 +67,6 @@ def create_user_if_not_exists():
     if existing_user == None:
         user = create_user_with_sixteen_digit_auth_token()
         user.is_superuser = True
+        user.name = "First admin"
         save_user(user)
         logger.info("First super user is: " + str(user))

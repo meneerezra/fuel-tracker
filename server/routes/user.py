@@ -10,16 +10,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
 security = HTTPBearer()
 
+class CreateUser(BaseModel):
+    name: str
+    is_superuser: bool
+
 @router.post("/")
 def create_user(
+        user: CreateUser,
         credentials: HTTPAuthorizationCredentials = Depends(security),
     ):
     current_user = database.get_current_user(credentials)
-    if current_user == None:
-        raise HTTPException(status_code=401, detail="Access denied")
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Access denied user does not exist")
     if not current_user.is_superuser:
-        raise HTTPException(status_code=401, detail="Access denied")
+        raise HTTPException(status_code=401, detail="Access denied not enough permissions")
     new_user = create_user_with_sixteen_digit_auth_token()
+    new_user.name = user.name
+    new_user.is_superuser = user.is_superuser
     database.save_user(new_user)
     return new_user
 

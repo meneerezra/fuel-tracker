@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 class User(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    name: str | None = Field(default=None)
     auth_token: int 
     is_superuser: bool = Field(default=False)
 
