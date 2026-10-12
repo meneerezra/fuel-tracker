@@ -45,7 +45,7 @@ class _HomePageState extends State<HomePage> {
         },
         destinations: [
           NavigationDestination(
-            icon: animatedIcon(Icons.home_outlined, 0),
+            icon: animatedIcon(Icons.home, 0),
             selectedIcon: animatedIcon(Icons.home, 0),
             label: 'Home',
           ),
