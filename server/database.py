@@ -11,19 +11,24 @@ from models.user import User, create_user_with_sixteen_digit_auth_token
 import logging
 logger = logging.getLogger(__name__)
 
-def save_user(user: User):
+def save_user(user: User)-> User:
     with Session(engine) as session:
         session.add(user)
         session.commit()
         session.refresh(user)
     return user
 
-def save_car(car: Car):
+def save_car(car: Car) -> Car:
     with Session(engine) as session:
         session.add(car)
         session.commit()
         session.refresh(car)
     return car
+
+def delete_car(car: Car): 
+    with Session(engine) as session:
+        session.delete(car)
+        session.commit()
 
 def get_car_by_id(id: int) -> Car | None:
     with Session(engine) as session:

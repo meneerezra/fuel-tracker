@@ -51,6 +51,8 @@ def edit_car(
     if user is None:
         raise HTTPException(401, "Access denied")
     db_car = database.get_car_by_id(car.id)
+    if db_car not in user.owned_cars:
+        raise HTTPException(401, "Access denied")
     if not db_car:
         raise HTTPException(404, "Car does not exist")
 
@@ -59,3 +61,22 @@ def edit_car(
     database.save_car(db_car)
     return db_car
 
+class DeleteCar(BaseModel):
+    id: int
+
+@router.delete("/")
+def delete_car(
+        car: DeleteCar,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ):
+    user = database.get_current_user(credentials)
+    if user is None:
+        raise HTTPException(401, "Access denied")
+    db_car = database.get_car_by_id(car.id)
+    if db_car not in user.owned_cars:
+        raise HTTPException(401, "Access denied")
+    if not db_car:
+        raise HTTPException(404, "Car does not exist")
+
+    database.delete_car(db_car)
+    return 200
