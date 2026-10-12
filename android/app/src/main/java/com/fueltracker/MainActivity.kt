@@ -4,16 +4,23 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,34 +28,34 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MaterialTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    greeting(
-                        name = "Fuel Tracker",
-                        modifier = Modifier.padding(innerPadding),
-                    )
+                Scaffold { innerPadding ->
+                    messageCard(Message("Gurt", "yo"))
                 }
             }
         }
     }
 }
 
+data class Message(val author: String, val body: String)
+
 @Composable
-fun greeting(name: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Hello, $name!",
-            style = MaterialTheme.typography.headlineMedium,
+fun messageCard(message: Message) {
+    Row {
+        Image(
+            painter = painterResource(R.drawable.profile_picture),
+            contentDescription = "Contact profile picture",
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
         )
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column {
+            Text(text = message.body)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = message.author)
+        }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun greetingPreview() {
-    MaterialTheme {
-        greeting("Fuel Tracker")
-    }
-}
+
