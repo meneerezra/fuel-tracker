@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:fuel_tracker/authentication.dart';
 
-class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({
+    super.key,
+    required this.mode,
+    required this.onModeChanged,
+  });
 
-  @override
-  State<SettingsPage> createState() => _SettingsPageState();
-}
+  final ThemeMode mode;
+  final ValueChanged<ThemeMode> onModeChanged;
 
-class _SettingsPageState extends State<SettingsPage> {
-  bool isDarkMode = false;
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
+    final isDarkMode = mode == ThemeMode.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -30,7 +32,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               title: Text('Dark mode'),
               onChanged: (value) {
-                setState(() => isDarkMode = value);
+                onModeChanged(value ? ThemeMode.dark : ThemeMode.light);
               },
             ),
             const Divider(thickness: 1),
