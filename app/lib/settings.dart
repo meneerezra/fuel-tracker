@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:fuel_tracker/authentication.dart';
+import 'package:fuel_tracker/secure_storage.dart';
+import 'package:fuel_tracker/storage_service.dart';
 
 class SettingsPage extends StatelessWidget {
+  final ThemeMode mode;
+  final ValueChanged<ThemeMode> onModeChanged;
+  final StorageService storage;
+  final AuthStorage authStorage;
   const SettingsPage({
     super.key,
     required this.mode,
     required this.onModeChanged,
+    required this.storage,
+    required this.authStorage,
   });
-
-  final ThemeMode mode;
-  final ValueChanged<ThemeMode> onModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +49,10 @@ class SettingsPage extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AuthenticationPage(),
+                    builder: (context) => AuthenticationPage(
+                      storage: storage,
+                      authStorage: authStorage,
+                    ),
                   ),
                 );
               },
