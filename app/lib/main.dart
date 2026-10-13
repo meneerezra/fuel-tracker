@@ -4,27 +4,17 @@ import 'package:fuel_tracker/home_page.dart';
 import 'settings.dart';
 
 void main() {
-  runApp(const FuelTracker());
+  runApp(MaterialApp(title: 'Fuel Tracker', home: const FuelTracker()));
 }
 
-class FuelTracker extends StatelessWidget {
+class FuelTracker extends StatefulWidget {
   const FuelTracker({super.key});
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(title: 'Fuel Tracker', home: const FuelTrackerPage());
-  }
+  State<FuelTracker> createState() => _FuelTrackerState();
 }
 
-class FuelTrackerPage extends StatefulWidget {
-  const FuelTrackerPage({super.key});
-
-  @override
-  State<FuelTrackerPage> createState() => _FuelTrackerState();
-}
-
-class _FuelTrackerState extends State<FuelTrackerPage> {
+class _FuelTrackerState extends State<FuelTracker> {
   int currentIndex = 0;
 
   final List<Widget> pages = [const HomePage(), const SettingsPage()];
