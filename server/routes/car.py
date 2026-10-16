@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 import database
-from models.car import Car 
+from models.car import Car
+from models.fuel_type import FuelType 
 
 router = APIRouter(prefix="/cars", tags=["cars"])
 security = HTTPBearer()
@@ -24,6 +25,8 @@ def get_car(
 
 class CreateCar(BaseModel):
     name: str
+    km_threshold: float
+    fuel_type: FuelType
 
 @router.post("/")
 def create_car(
@@ -33,9 +36,18 @@ def create_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    db_car = Car(name=car.name, owner=user)
+    db_car = Car(name=car.name, km_treshold=car.km_threshold, fuel_type=car.fuel_type, owner=user)
     database.save_car(db_car)
     return db_car
+
+def get_fuel_price(
+       car: Car,         
+       credentials: HTTPAuthorizationCredentials = Depends(security),
+    ):
+    user = database.get_current_user(credentials)
+    if user is None:
+        raise HTTPException(401, "Access denied")
+
 
 class EditCar(BaseModel):
     id: int
