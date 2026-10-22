@@ -41,10 +41,6 @@ def create_car(
     db_car = Car(name=car.name, km_treshold=car.km_threshold, fuel_type=car.fuel_type, consumption=car.consumption, owner=user)
     database.save_car(db_car)
     return db_car
-
-class GetPrice(BaseModel):
-    id: int
-
 class GetPriceResult(BaseModel):
     price_per_km: float
     price_per_threshold: float
@@ -70,7 +66,6 @@ def get_price(
     price_per_threshold = price_per_km * car.km_treshold
     
     return GetPriceResult(price_per_km=round(price_per_km,2),  price_per_threshold=round(price_per_threshold, 2))
-
 
 class EditCar(BaseModel):
     id: int

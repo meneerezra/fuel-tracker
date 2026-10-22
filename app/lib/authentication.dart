@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
@@ -16,8 +18,10 @@ class AuthenticationPage extends StatefulWidget {
 }
 
 class _AuthenticationPageState extends State<AuthenticationPage> {
-  String? url;
-  String? token;
+  final _tokenController = TextEditingController();
+  final _urlController = TextEditingController();
+  Timer? _saveTimer;
+  bool _obscureToken = true;
 
   @override
   void initState() {
@@ -31,10 +35,30 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
 
     if (!mounted) return;
 
-    setState(() {
-      url = savedUrl;
-      token = savedToken;
-    });
+    _tokenController.text = savedToken ?? '';
+    _urlController.text = savedUrl ?? '';
+  }
+
+  void _scheduleSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 400), _save);
+  }
+
+  Future<void> _save() async {
+    final newToken = _tokenController.text.trim();
+    final newUrl = _urlController.text.trim();
+
+    await widget.authStorage.saveToken(newToken);
+    await widget.storage.saveServerUrl(newUrl);
+  }
+
+  @override
+  void dispose() {
+    _saveTimer?.cancel();
+    unawaited(_save());
+    _tokenController.dispose();
+    _urlController.dispose();
+    super.dispose();
   }
 
   @override
@@ -42,101 +66,46 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Authentication')),
       body: SafeArea(
-        child: Column(
-          children: [
-            ListTile(
-              title: const Text('Auth Token'),
-              subtitle: Text(
-                token == null || token!.isEmpty
-                    ? 'No auth token set'
-                    : 'Auth token configured',
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextFormField(
+                controller: _urlController,
+                decoration: const InputDecoration(
+                  border: UnderlineInputBorder(),
+                  hintText: 'https://example.com',
+                  labelText: 'Server URL',
+                ),
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                onChanged: (_) => _scheduleSave(),
+                onFieldSubmitted: (_) => _save(),
               ),
-              onTap: () {
-                final controller = TextEditingController(text: token);
-
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text('Auth Token'),
-                      content: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        decoration: const InputDecoration(
-                          hintText: '1234567891234567',
-                          labelText: 'Sixteen digit token',
-                        ),
-                        keyboardType: TextInputType.text,
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            final newToken = controller.text.trim();
-
-                            setState(() {
-                              token = newToken;
-                            });
-                            widget.authStorage.saveToken(newToken);
-
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-            ListTile(
-              title: const Text('Server URL'),
-              subtitle: Text(url ?? 'The URL of the host server'),
-              onTap: () {
-                final controller = TextEditingController(text: url);
-
-                showDialog(
-                  context: context,
-                  builder: (context) {
-                    return AlertDialog(
-                      title: const Text('Server URL'),
-                      content: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        decoration: const InputDecoration(
-                          hintText: 'https://example.com',
-                          labelText: 'URL',
-                        ),
-                        keyboardType: TextInputType.url,
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            final newUrl = controller.text.trim();
-
-                            setState(() {
-                              url = newUrl;
-                            });
-                            widget.storage.saveServerUrl(newUrl);
-
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Save'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _tokenController,
+                decoration: InputDecoration(
+                  border: const UnderlineInputBorder(),
+                  hintText: '1234567891234567',
+                  labelText: 'Auth token',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureToken ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscureToken = !_obscureToken),
+                    tooltip: _obscureToken ? 'Show token' : 'Hide token',
+                  ),
+                ),
+                obscureText: _obscureToken,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                onChanged: (_) => _scheduleSave(),
+              ),
+            ],
+          ),
         ),
       ),
     );
