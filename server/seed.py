@@ -13,6 +13,7 @@ from sqlmodel import Session, select
 
 import database
 from models.car import Car
+from models.fuel_type import FuelType
 from models.user import create_user_with_sixteen_digit_auth_token
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
@@ -22,12 +23,12 @@ USERS = 2
 
 # Owned exclusively by each user, in order.
 OWNED_CARS = [
-    ["Toyota Corolla", "Honda Civic"],
-    ["Subaru Outback", "Mazda MX-5"],
+    [("Toyota Corolla", FuelType.GAS), ("Honda Civic", FuelType.GAS)],
+    [("Subaru Outback", FuelType.DIESEL), ("Mazda MX-5", FuelType.GAS)],
 ]
 
 # Owned by the first user but linked to everyone.
-SHARED_CARS = ["Ford Ranger"]
+SHARED_CARS = [("Ford Ranger", FuelType.DIESEL)]
 
 
 def seed() -> None:
@@ -45,10 +46,15 @@ def seed() -> None:
 
         # owner_id is NOT NULL, so shared cars still need an owner. The first
         # user owns them; everyone reaches them through the link table.
-        shared = [Car(name=name) for name in SHARED_CARS]
+        shared = [
+            Car(name=name, fuel_type=fuel_type) for name, fuel_type in SHARED_CARS
+        ]
 
         for n, user in enumerate(users):
-            user.owned_cars = [Car(name=name) for name in OWNED_CARS[n]]
+            user.owned_cars = [
+                Car(name=name, fuel_type=fuel_type)
+                for name, fuel_type in OWNED_CARS[n]
+            ]
             if n == 0:
                 user.owned_cars += shared
             user.cars = list(shared)

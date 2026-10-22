@@ -17,13 +17,11 @@ class Car(SQLModel, table=True):
             "foreign_keys": "[Car.owner_id]",
         },
     )
-    km_driven: float | None = Field(default=None)
-    km_treshold: float | None = Field(default=None)
-    total_km_driven: float | None = Field(default=None)
-    fuel_price_per_liter: float | None = Field(default=None)
-    fuel_price_per_threshold_hit: float | None = Field(default=None)
-    consumption: float | None = Field(default=None)
-    fuel_type: FuelType | None = Field(default=None)
+    km_driven: float | float = Field(default=0)
+    km_treshold: float | float = Field(default=0)
+    total_km_driven: float | float = Field(default=0)
+    consumption: float | float = Field(default=0)
+    fuel_type: FuelType 
 
     users: list["User"] = Relationship(back_populates="cars", link_model=UserCarLink)
 

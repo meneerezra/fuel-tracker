@@ -15,7 +15,11 @@ logger = logging.getLogger(__name__)
 create_db_and_tables()
 create_user_if_not_exists()
 
-app = FastAPI()
+app = FastAPI(
+  swagger_ui_parameters={
+        "persistAuthorization": True,
+    }
+)
 v1_router = APIRouter(prefix="/v1")
 
 v1_router.include_router(car.router)
