@@ -2,6 +2,7 @@ from typing import cast
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials
+from sqlalchemy import Index
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 from sqlmodel import SQLModel, Session, create_engine
 from sqlmodel import Session, select
@@ -52,18 +53,20 @@ def get_current_user(
         credentials: HTTPAuthorizationCredentials, 
 ) -> User | None:
     token = credentials.credentials
-    auth_token = None
-    try:
-        auth_token = int(token)
-    except ValueError:
+    if len(token) != 16 or not token.isascii() or not token.isdigit():
         return None
 
-    return get_user_by_auth_token(auth_token)
+    return get_user_by_auth_token(int(token))
 
 engine = create_engine("sqlite:///database.db")
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    Index(
+        "ix_user_auth_token",
+        SQLModel.metadata.tables["user"].c.auth_token,
+        unique=True,
+    ).create(engine, checkfirst=True)
 
 def create_user_if_not_exists():
     with Session(engine) as session:
@@ -74,4 +77,4 @@ def create_user_if_not_exists():
         user.is_superuser = True
         user.name = "First admin"
         save_user(user)
-        logger.info("First super user is: " + str(user))
+        logger.info("Created first super user id=%s name=%s", user.id, user.name)

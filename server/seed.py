@@ -61,9 +61,8 @@ def seed() -> None:
             session.flush()
 
             logger.info(
-                "Seeded user id=%s auth_token=%s superuser=%s owned=%s shared=%s",
+                "Seeded user id=%s superuser=%s owned=%s shared=%s",
                 user.id,
-                user.auth_token,
                 user.is_superuser,
                 [c.name for c in user.owned_cars],
                 [c.name for c in user.cars],
