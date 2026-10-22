@@ -1,8 +1,9 @@
+import sqlite3
 from typing import cast
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials
-from sqlalchemy import Index
+from sqlalchemy import Index, event
 from sqlalchemy.orm import InstrumentedAttribute, selectinload
 from sqlmodel import SQLModel, Session, create_engine
 from sqlmodel import Session, select
@@ -59,6 +60,13 @@ def get_current_user(
     return get_user_by_auth_token(int(token))
 
 engine = create_engine("sqlite:///database.db")
+
+@event.listens_for(engine, "connect")
+def _enable_sqlite_foreign_keys(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

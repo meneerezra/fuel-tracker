@@ -58,10 +58,10 @@ def get_price(
     if user is None:
         raise HTTPException(401, "Access denied")
     car = database.get_car_by_id(car_id)
-    if car not in user.owned_cars:
-        raise HTTPException(401, "Access denied")
     if not car:
         raise HTTPException(404, "Car does not exist")
+    if car not in user.owned_cars:
+        raise HTTPException(401, "Access denied")
     history = fetch_country_history("nl")
     latest = history.latest(car.fuel_type)
     if latest is None:
@@ -75,7 +75,6 @@ def get_price(
 class EditCar(BaseModel):
     id: int
     name: str
-    owner_id: int
     km_threshold: float
     km_driven: float
     total_km_driven: float
@@ -97,7 +96,6 @@ def edit_car(
         raise HTTPException(401, "Access denied")
 
     db_car.name = car.name
-    db_car.owner_id = car.owner_id
     db_car.km_treshold = car.km_threshold
     db_car.km_driven = car.km_driven
     db_car.total_km_driven = car.total_km_driven
