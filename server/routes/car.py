@@ -5,7 +5,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import database
 from models.car import Car
 from models.fuel_type import FuelType
-from services.fuel_prices import fetch_country_history 
+from services.fuel_prices import (
+    CountryNotFoundError,
+    FuelPriceServiceError,
+    InvalidCountryCodeError,
+    fetch_country_history,
+)
 
 router = APIRouter(prefix="/cars", tags=["cars"])
 security = HTTPBearer()
@@ -29,6 +34,7 @@ class CreateCar(BaseModel):
     km_threshold: float
     fuel_type: FuelType
     consumption: float
+    country_code: str = "NL"
 
 @router.post("/")
 def create_car(
@@ -38,7 +44,7 @@ def create_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    db_car = Car(name=car.name, km_treshold=car.km_threshold, fuel_type=car.fuel_type, consumption=car.consumption, owner=user)
+    db_car = Car(name=car.name, km_treshold=car.km_threshold, fuel_type=car.fuel_type, consumption=car.consumption, country_code=car.country_code, owner=user)
     database.save_car(db_car)
     return db_car
 class GetPriceResult(BaseModel):
@@ -58,7 +64,14 @@ def get_price(
         raise HTTPException(404, "Car does not exist")
     if car not in user.owned_cars:
         raise HTTPException(401, "Access denied")
-    history = fetch_country_history("nl")
+    try:
+        history = fetch_country_history(car.country_code)
+    except InvalidCountryCodeError:
+        raise HTTPException(400, "Invalid country code")
+    except CountryNotFoundError:
+        raise HTTPException(404, "No price data for this country")
+    except FuelPriceServiceError:
+        raise HTTPException(502, "Could not reach the fuel price service")
     latest = history.latest(car.fuel_type)
     if latest is None:
         raise HTTPException(400, "Could not get latest price")
@@ -75,6 +88,7 @@ class EditCar(BaseModel):
     total_km_driven: float
     consumption: float
     fuel_type: FuelType
+    country_code: str = "NL"
 
 @router.put("/")
 def edit_car(
@@ -96,6 +110,7 @@ def edit_car(
     db_car.total_km_driven = car.total_km_driven
     db_car.consumption = car.consumption
     db_car.fuel_type = car.fuel_type
+    db_car.country_code = car.country_code
     database.save_car(db_car)
     return db_car
 

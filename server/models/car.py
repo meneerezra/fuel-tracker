@@ -22,6 +22,7 @@ class Car(SQLModel, table=True):
     total_km_driven: float | float = Field(default=0)
     consumption: float | float = Field(default=0)
     fuel_type: FuelType 
+    country_code: str = Field(default="NL")
 
     users: list["User"] = Relationship(back_populates="cars", link_model=UserCarLink)
 

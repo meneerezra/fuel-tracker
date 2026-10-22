@@ -3,6 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
 import database
+from models.fuel_type import FuelType
 from models.user import User, create_user_with_sixteen_digit_auth_token
 import logging
 logger = logging.getLogger(__name__)
@@ -34,6 +35,12 @@ class CarOut(BaseModel):
     id: int | None = None
     name: str
     owner_id: int | None = None
+    km_driven: float = 0
+    km_treshold: float = 0
+    total_km_driven: float = 0
+    consumption: float = 0
+    fuel_type: FuelType
+    country_code: str = "NL"
 
 class UserOut(BaseModel):
     id: int | None = None

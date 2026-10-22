@@ -2,17 +2,67 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+enum FuelType {
+  diesel('diesel'),
+  e95('e95');
+
+  const FuelType(this.value);
+
+  final String value;
+
+  static FuelType fromJson(String value) {
+    return FuelType.values.firstWhere(
+      (fuelType) => fuelType.value == value,
+      orElse: () => throw FormatException('Unknown fuel type: $value'),
+    );
+  }
+}
+
 class Car {
-  const Car({this.id, required this.name, this.ownerId});
+  const Car({
+    this.id,
+    required this.name,
+    this.ownerId,
+    this.kmDriven = 0,
+    this.kmTreshold = 0,
+    this.totalKmDriven = 0,
+    this.consumption = 0,
+    required this.fuelType,
+    this.countryCode = 'NL',
+  });
 
   final int? id;
   final String name;
   final int? ownerId;
+  final double kmDriven;
+  final double kmTreshold;
+  final double totalKmDriven;
+  final double consumption;
+  final FuelType fuelType;
+  final String countryCode;
 
   factory Car.fromJson(Map<String, dynamic> json) => Car(
-    id: json['id'] as int?,
+    id: (json['id'] as num?)?.toInt(),
     name: json['name'] as String,
-    ownerId: json['owner_id'] as int?,
+    ownerId: (json['owner_id'] as num?)?.toInt(),
+    kmDriven: (json['km_driven'] as num?)?.toDouble() ?? 0,
+    kmTreshold: (json['km_treshold'] as num?)?.toDouble() ?? 0,
+    totalKmDriven: (json['total_km_driven'] as num?)?.toDouble() ?? 0,
+    consumption: (json['consumption'] as num?)?.toDouble() ?? 0,
+    fuelType: FuelType.fromJson(json['fuel_type'] as String),
+    countryCode: json['country_code'] as String? ?? 'NL',
+  );
+}
+
+class CarPrice {
+  const CarPrice({required this.pricePerKm, required this.pricePerThreshold});
+
+  final double pricePerKm;
+  final double pricePerThreshold;
+
+  factory CarPrice.fromJson(Map<String, dynamic> json) => CarPrice(
+    pricePerKm: (json['price_per_km'] as num).toDouble(),
+    pricePerThreshold: (json['price_per_threshold'] as num).toDouble(),
   );
 }
 
@@ -32,16 +82,18 @@ class User {
   final List<Car> ownedCars;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
-    id: json['id'] as int,
-    authToken: json['auth_token'] as int,
+    id: (json['id'] as num).toInt(),
+    authToken: (json['auth_token'] as num).toInt(),
     isSuperuser: json['is_superuser'] as bool,
-    cars: (json['cars'] as List<dynamic>)
-        .map((e) => Car.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    ownedCars: (json['owned_cars'] as List<dynamic>)
-        .map((e) => Car.fromJson(e as Map<String, dynamic>))
-        .toList(),
+    cars: _carsFromJson(json['cars']),
+    ownedCars: _carsFromJson(json['owned_cars']),
   );
+
+  static List<Car> _carsFromJson(Object? json) {
+    return (json as List<dynamic>)
+        .map((car) => Car.fromJson(car as Map<String, dynamic>))
+        .toList();
+  }
 }
 
 class ApiException implements Exception {
@@ -54,50 +106,120 @@ class ApiException implements Exception {
 }
 
 class Api {
-  Api({String? baseUrl}) : baseUrl = baseUrl ?? _defaultBaseUrl;
+  Api({String? baseUrl, this.authToken})
+    : baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBaseUrl);
 
   static const _defaultBaseUrl =
       'http://10.0.2.2:8000'; // Android emulator -> host localhost
 
   final String baseUrl;
-  int? _authToken;
+  int? authToken;
+
+  static String _normalizeBaseUrl(String url) {
+    final trimmed = url.trim();
+    return trimmed.endsWith('/')
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
+  }
 
   Map<String, String> get _headers => {
     'Content-Type': 'application/json',
-    if (_authToken != null) 'Authorization': 'Bearer $_authToken',
+    if (authToken != null) 'Authorization': 'Bearer $authToken',
   };
 
   Future<User> login(int authToken) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/users/me'),
+      _uri('/users/me'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $authToken',
       },
     );
-    if (response.statusCode != 200) {
-      throw ApiException('Login failed (${response.statusCode})');
-    }
-    _authToken = authToken;
+    _ensureOk(response, action: 'Login failed');
+    this.authToken = authToken;
     return User.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<User> me() => _getUser('$baseUrl/users/me');
+  Future<User> me() => _getUser('/users/me');
 
   Future<User> _getUser(String path) async {
-    final response = await http.get(Uri.parse(path), headers: _headers);
+    final response = await http.get(_uri(path), headers: _headers);
     _ensureOk(response);
     return User.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<Car> createCar(String name) async {
+  Future<Car> getCar(int carId) async {
+    final response = await http.get(_uri('/cars/$carId'), headers: _headers);
+    _ensureOk(response);
+    return Car.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<Car> createCar({
+    required String name,
+    required double kmThreshold,
+    required FuelType fuelType,
+    required double consumption,
+    String countryCode = 'NL',
+  }) async {
     final response = await http.post(
-      Uri.parse('$baseUrl/cars/'),
+      _uri('/cars/'),
       headers: _headers,
-      body: jsonEncode({'name': name}),
+      body: jsonEncode({
+        'name': name,
+        'km_threshold': kmThreshold,
+        'fuel_type': fuelType.value,
+        'consumption': consumption,
+        'country_code': countryCode,
+      }),
     );
     _ensureOk(response);
     return Car.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<Car> editCar({
+    required int id,
+    required String name,
+    required double kmThreshold,
+    required double kmDriven,
+    required double totalKmDriven,
+    required double consumption,
+    required FuelType fuelType,
+    String countryCode = 'NL',
+  }) async {
+    final response = await http.put(
+      _uri('/cars/'),
+      headers: _headers,
+      body: jsonEncode({
+        'id': id,
+        'name': name,
+        'km_threshold': kmThreshold,
+        'km_driven': kmDriven,
+        'total_km_driven': totalKmDriven,
+        'consumption': consumption,
+        'fuel_type': fuelType.value,
+        'country_code': countryCode,
+      }),
+    );
+    _ensureOk(response);
+    return Car.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<void> deleteCar(int id) async {
+    final response = await http.delete(
+      _uri('/cars/'),
+      headers: _headers,
+      body: jsonEncode({'id': id}),
+    );
+    _ensureOk(response);
+  }
+
+  Future<CarPrice> getPrice(int carId) async {
+    final response = await http.get(
+      _uri('/cars/$carId/price'),
+      headers: _headers,
+    );
+    _ensureOk(response);
+    return CarPrice.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<List<Car>> ownedCars() async {
@@ -105,9 +227,35 @@ class Api {
     return user.ownedCars;
   }
 
-  void _ensureOk(http.Response response) {
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw ApiException('Request failed (${response.statusCode})');
+  Future<User> createUser({
+    required String name,
+    required bool isSuperuser,
+  }) async {
+    final response = await http.post(
+      _uri('/users/'),
+      headers: _headers,
+      body: jsonEncode({'name': name, 'is_superuser': isSuperuser}),
+    );
+    _ensureOk(response);
+    return User.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Uri _uri(String path) => Uri.parse('$baseUrl/v1$path');
+
+  void _ensureOk(http.Response response, {String? action}) {
+    if (response.statusCode >= 200 && response.statusCode < 300) return;
+
+    var message = action ?? 'Request failed';
+
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map<String, dynamic> && body['detail'] is String) {
+        message = body['detail'] as String;
+      }
+    } on FormatException {
+      // Keep the generic message when the body is not JSON.
     }
+
+    throw ApiException('$message (${response.statusCode})');
   }
 }
