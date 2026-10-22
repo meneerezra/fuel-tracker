@@ -40,13 +40,15 @@ def create_car(
     database.save_car(db_car)
     return db_car
 
-def get_fuel_price(
+def get_fuel_price_nl(
        car: Car,         
        credentials: HTTPAuthorizationCredentials = Depends(security),
     ):
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
+
+    
 
 
 class EditCar(BaseModel):

@@ -22,6 +22,7 @@ class Car(SQLModel, table=True):
     total_km_driven: float | None = Field(default=None)
     fuel_price_per_liter: float | None = Field(default=None)
     fuel_price_per_threshold_hit: float | None = Field(default=None)
+    consumption: float | None = Field(default=None)
     fuel_type: FuelType | None = Field(default=None)
 
     users: list["User"] = Relationship(back_populates="cars", link_model=UserCarLink)

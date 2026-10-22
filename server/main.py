@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 
 from database import create_db_and_tables, create_user_if_not_exists
 from routes import car, user
@@ -16,8 +16,12 @@ create_db_and_tables()
 create_user_if_not_exists()
 
 app = FastAPI()
-app.include_router(car.router)
-app.include_router(user.router)
+v1_router = APIRouter(prefix="/v1")
+
+v1_router.include_router(car.router)
+v1_router.include_router(user.router)
+
+app.include_router(v1_router)
 
 @app.get("/")
 def read_root():
