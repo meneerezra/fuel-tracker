@@ -63,13 +63,13 @@ def get_price(
     if not car:
         raise HTTPException(404, "Car does not exist")
     history = fetch_country_history("nl")
-    latest = history.latest(FuelType.GAS)
+    latest = history.latest(car.fuel_type)
     if latest is None:
         raise HTTPException(400, "Could not get latest price")
-    price_per_km = round(latest.price * car.consumption / 100, 2)
-    price_per_threshold = round(price_per_km * car.km_treshold, 2)
+    price_per_km = latest.price * car.consumption / 100
+    price_per_threshold = price_per_km * car.km_treshold
     
-    return GetPriceResult(price_per_km=price_per_km,  price_per_threshold=price_per_threshold)
+    return GetPriceResult(price_per_km=round(price_per_km,2),  price_per_threshold=round(price_per_threshold, 2))
 
 
 class EditCar(BaseModel):
