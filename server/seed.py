@@ -57,7 +57,7 @@ def seed() -> None:
             ]
             if n == 0:
                 user.owned_cars += shared
-            user.cars = list(shared)
+            user.shared_cars = list(shared)
             session.flush()
 
             logger.info(
@@ -65,7 +65,7 @@ def seed() -> None:
                 user.id,
                 user.is_superuser,
                 [c.name for c in user.owned_cars],
-                [c.name for c in user.cars],
+                [c.name for c in user.shared_cars],
             )
 
         session.commit()
@@ -79,7 +79,7 @@ def verify() -> None:
         for u in users:
             print(f"  user id={u.id} auth_token={u.auth_token} superuser={u.is_superuser}")
             print(f"    owns:   {[c.name for c in u.owned_cars]}")
-            print(f"    shared: {[c.name for c in u.cars]}")
+            print(f"    shared: {[c.name for c in u.shared_cars]}")
 
 
 if __name__ == "__main__":

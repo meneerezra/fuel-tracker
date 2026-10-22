@@ -19,7 +19,7 @@ security = HTTPBearer()
 def get_car(
         car_id: int,
         credentials: HTTPAuthorizationCredentials = Depends(security),
-    ):
+    ) -> Car:
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
@@ -40,13 +40,14 @@ class CreateCar(BaseModel):
 def create_car(
         car: CreateCar,
         credentials: HTTPAuthorizationCredentials = Depends(security),
-    ):
+    ) -> Car:
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
     db_car = Car(name=car.name, km_treshold=car.km_threshold, fuel_type=car.fuel_type, consumption=car.consumption, country_code=car.country_code, owner=user)
     database.save_car(db_car)
     return db_car
+
 class GetPriceResult(BaseModel):
     price_per_km: float
     price_per_threshold: float
@@ -55,7 +56,7 @@ class GetPriceResult(BaseModel):
 def get_price(
         car_id: int,
         credentials: HTTPAuthorizationCredentials = Depends(security),
-    ):
+    ) -> GetPriceResult:
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
@@ -94,7 +95,7 @@ class EditCar(BaseModel):
 def edit_car(
         car: EditCar,
         credentials: HTTPAuthorizationCredentials = Depends(security),
-    ):
+    ) -> Car:
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
@@ -111,8 +112,8 @@ def edit_car(
     db_car.consumption = car.consumption
     db_car.fuel_type = car.fuel_type
     db_car.country_code = car.country_code
-    database.save_car(db_car)
-    return db_car
+    updated_car = database.save_car(db_car)
+    return updated_car
 
 class DeleteCar(BaseModel):
     id: int
@@ -132,4 +133,3 @@ def delete_car(
         raise HTTPException(404, "Car does not exist")
 
     database.delete_car(db_car)
-    return 200

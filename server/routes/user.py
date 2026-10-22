@@ -19,7 +19,7 @@ class CreateUser(BaseModel):
 def create_user(
         user: CreateUser,
         credentials: HTTPAuthorizationCredentials = Depends(security),
-    ):
+    ) -> User:
     current_user = database.get_current_user(credentials)
     if not current_user:
         raise HTTPException(status_code=401, detail="Access denied user does not exist")
@@ -44,15 +44,14 @@ class CarOut(BaseModel):
 
 class UserOut(BaseModel):
     id: int | None = None
-    auth_token: int
     is_superuser: bool
-    cars: list[CarOut] 
+    shared_cars: list[CarOut] 
     owned_cars: list[CarOut] 
 
 @router.get("/me", response_model=UserOut)
 def view_current_user(
         credentials: HTTPAuthorizationCredentials = Depends(security),
-    ):
+    ) -> User:
     current_user = database.get_current_user(credentials)
     if current_user == None:
         raise HTTPException(status_code=401, detail="Access denied")

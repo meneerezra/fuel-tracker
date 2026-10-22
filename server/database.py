@@ -43,7 +43,7 @@ def get_user_by_auth_token(auth_token: int) -> User | None:
             select(User).
             where(User.auth_token == auth_token).
             options(
-                selectinload(cast(InstrumentedAttribute, User.cars)),
+                selectinload(cast(InstrumentedAttribute, User.shared_cars)),
                 selectinload(cast(InstrumentedAttribute, User.owned_cars)),
             )
          )

@@ -24,6 +24,6 @@ class Car(SQLModel, table=True):
     fuel_type: FuelType 
     country_code: str = Field(default="NL")
 
-    users: list["User"] = Relationship(back_populates="cars", link_model=UserCarLink)
+    users: list["User"] = Relationship(back_populates="shared_cars", link_model=UserCarLink)
 
 

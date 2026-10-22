@@ -23,7 +23,7 @@ class User(SQLModel, table=True):
             "foreign_keys": "[Car.owner_id]",
         },
     )
-    cars: list["Car"] = Relationship(back_populates="users", link_model=UserCarLink)
+    shared_cars: list["Car"] = Relationship(back_populates="users", link_model=UserCarLink)
 
 def generate_sixteen_digit_auth_token() -> int:
     """Return a cryptographically secure token that is always 16 digits."""
