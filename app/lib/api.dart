@@ -69,23 +69,20 @@ class CarPrice {
 class User {
   const User({
     required this.id,
-    required this.authToken,
     required this.isSuperuser,
-    required this.cars,
+    required this.sharedCars,
     required this.ownedCars,
   });
 
   final int id;
-  final int authToken;
   final bool isSuperuser;
-  final List<Car> cars;
+  final List<Car> sharedCars;
   final List<Car> ownedCars;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: (json['id'] as num).toInt(),
-    authToken: (json['auth_token'] as num).toInt(),
     isSuperuser: json['is_superuser'] as bool,
-    cars: _carsFromJson(json['cars']),
+    sharedCars: _carsFromJson(json['shared_cars']),
     ownedCars: _carsFromJson(json['owned_cars']),
   );
 
