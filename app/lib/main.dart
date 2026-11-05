@@ -108,7 +108,7 @@ class _FuelTrackerState extends State<FuelTracker> {
     final scheme = Theme.of(context).colorScheme;
 
     final pages = [
-      const HomePage(),
+      HomePage(storage: widget.storage, authStorage: widget.authStorage),
       SettingsPage(
         authStorage: widget.authStorage,
         storage: widget.storage,
