@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
@@ -31,11 +32,9 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
 
   Future<void> _loadSettings() async {
     final savedUrl = widget.storage.getServerUrl();
-    final savedToken = await widget.authStorage.getAuthToken();
+    final rawToken = await widget.authStorage.getAuthToken();
 
-    if (!mounted) return;
-
-    _tokenController.text = savedToken ?? '';
+    _tokenController.text = rawToken?.toString() ?? '';
     _urlController.text = savedUrl ?? '';
   }
 
@@ -44,9 +43,24 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     _saveTimer = Timer(const Duration(milliseconds: 400), _save);
   }
 
-  Future<void> _save() async {
-    final newToken = _tokenController.text.trim();
+  Future<void> _save({bool showError = true}) async {
+    final rawToken = _tokenController.text.trim();
     final newUrl = _urlController.text.trim();
+    int newToken;
+
+    try {
+      newToken = int.parse(rawToken);
+    } on Exception {
+      _tokenController.text = '';
+      if (showError && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid auth token. Please enter a valid integer.'),
+          ),
+        );
+      }
+      return;
+    }
 
     await widget.authStorage.saveToken(newToken);
     await widget.storage.saveServerUrl(newUrl);
@@ -55,7 +69,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
   @override
   void dispose() {
     _saveTimer?.cancel();
-    unawaited(_save());
+    unawaited(_save(showError: false));
     _tokenController.dispose();
     _urlController.dispose();
     super.dispose();
@@ -104,10 +118,42 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                 textInputAction: TextInputAction.next,
                 onChanged: (_) => _scheduleSave(),
               ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () async {
+                  final rawUrl = _urlController.text.trim();
+                  final token = int.tryParse(_tokenController.text.trim());
+
+                  if (rawUrl.isEmpty) {
+                    showAlert('Enter a server URL.');
+                    return;
+                  }
+                  if (token == null) {
+                    showAlert('Enter a valid auth token.');
+                    return;
+                  }
+
+                  final api = Api(baseUrl: rawUrl, authToken: token);
+                  try {
+                    await api.me();
+                    if (!mounted) return;
+                    showAlert('Connection succeeded.');
+                  } catch (e) {
+                    if (!mounted) return;
+                    showAlert('Connection failed: $e');
+                  }
+                },
+                child: Text("Test connection"),
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void showAlert(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 }

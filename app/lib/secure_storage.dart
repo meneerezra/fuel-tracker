@@ -7,12 +7,13 @@ class AuthStorage {
 
   AuthStorage(this._storage);
 
-  Future<void> saveToken(String authToken) async {
-    await _storage.write(key: _authToken, value: authToken);
+  Future<void> saveToken(int authToken) async {
+    await _storage.write(key: _authToken, value: authToken.toString());
   }
 
-  Future<String?> getAuthToken() {
-    return _storage.read(key: _authToken);
+  Future<int?> getAuthToken() async {
+    final token = await _storage.read(key: _authToken);
+    return token != null ? int.tryParse(token) : null;
   }
 
   Future<void> clearTokens() async {

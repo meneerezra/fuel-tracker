@@ -116,10 +116,15 @@ class Api {
   int? authToken;
 
   static String _normalizeBaseUrl(String url) {
-    final trimmed = url.trim();
-    return trimmed.endsWith('/')
-        ? trimmed.substring(0, trimmed.length - 1)
-        : trimmed;
+    var trimmed = url.trim();
+    if (trimmed.isEmpty) return _defaultBaseUrl;
+    if (!trimmed.contains('://')) {
+      trimmed = 'https://$trimmed';
+    }
+    while (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
   }
 
   Map<String, String> get _headers => {
@@ -240,7 +245,13 @@ class Api {
     return User.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Uri _uri(String path) => Uri.parse('$baseUrl/v1$path');
+  Uri _uri(String path) {
+    final uri = Uri.tryParse('$baseUrl/v1$path');
+    if (uri == null || !uri.hasAuthority) {
+      throw ApiException('Invalid server URL: $baseUrl');
+    }
+    return uri;
+  }
 
   void _ensureOk(http.Response response, {String? action}) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
