@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Talk to the server. Debug builds get this from the debug manifest, release
+         builds need it here. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- GPS trip tracking, also while the screen is locked. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -9,6 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="Fuel Tracker"
+        android:usesCleartextTraffic="true"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
