@@ -1,5 +1,5 @@
 # Fuel Tracker [WIP]
-I made this app to track how much km I have driven. I then convert it to fuel in liters and calculate how much money it cost so I can pay my dad back when I drive his car. My dad can also look at this information. It uses a 16 digit number for authentication inspired by Mullvad VPN. I chose it because it is easier then logging in for my father every 2 weeks.
+The idea of this app to track how much km I have driven. I then convert it to fuel in liters and calculate how much money it cost so I can pay my dad back when I drive his car. My dad can also look at this information. It uses a 16 digit number for authentication inspired by Mullvad VPN. I chose it because it is easier then logging in for my father every 2 weeks.
 
 ## Features
 - [ ] App with all features
