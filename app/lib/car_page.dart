@@ -116,6 +116,56 @@ class _CarPageState extends State<CarPage> {
     }
   }
 
+  /// Resets the trip after paying for the km driven. The odometer is kept.
+  Future<void> _markAsPaid() async {
+    CarPrice? price;
+    try {
+      price = await _price;
+    } catch (_) {
+      // Still allow resetting when the price is not available.
+    }
+    if (!mounted) return;
+    final owed = _owed(_car, price);
+    final km = _car.kmDriven.toStringAsFixed(0);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.payments_outlined),
+        title: const Text('Mark as paid?'),
+        content: Text(
+          owed == null
+              ? 'The trip of $km km is reset to 0 km.'
+              : 'You paid €${owed.toStringAsFixed(2)} for $km km. '
+                    'The trip is reset to 0 km.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Mark as paid'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final paid = await _save(_car.copyWith(kmDriven: 0));
+    if (!paid || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          owed == null
+              ? 'Trip reset'
+              : 'Paid €${owed.toStringAsFixed(2)}, trip reset',
+        ),
+      ),
+    );
+  }
+
   /// Deletes the car when owned, otherwise stops sharing it with this user.
   Future<void> _remove() async {
     final isOwner = widget.isOwner;
@@ -312,7 +362,19 @@ class _CarPageState extends State<CarPage> {
               ),
             ),
             const SizedBox(height: 16),
-            _ThresholdBar(car: _car),
+            Row(
+              children: [
+                Expanded(child: _ThresholdBar(car: _car)),
+                if (widget.isOwner)
+                  FilledButton.tonalIcon(
+                    onPressed: _saving || _car.kmDriven == 0
+                        ? null
+                        : _markAsPaid,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Paid'),
+                  ),
+              ],
+            ),
             SizedBox(height: screenHeight * 0.03),
             _CarHero(height: screenHeight * 0.22),
             SizedBox(height: screenHeight * 0.03),
@@ -465,6 +527,16 @@ class _CarPageState extends State<CarPage> {
   }
 }
 
+/// Money owed for the km driven since the last payment.
+double? _owed(Car car, CarPrice? price) {
+  final fuelPrice = price?.fuelPrice;
+  // Use the unrounded fuel price when the server sends it.
+  final pricePerKm = fuelPrice != null
+      ? fuelPrice * car.consumption / 100
+      : price?.pricePerKm;
+  return pricePerKm == null ? null : pricePerKm * car.kmDriven;
+}
+
 String _fuelTypeLabel(FuelType fuelType) {
   return switch (fuelType) {
     FuelType.diesel => 'Diesel',
@@ -576,12 +648,7 @@ class _PriceRow extends StatelessWidget {
     }
 
     final price = this.price;
-    final fuelPrice = price?.fuelPrice;
-    // Use the unrounded fuel price when the server sends it.
-    final pricePerKm = fuelPrice != null
-        ? fuelPrice * car.consumption / 100
-        : price?.pricePerKm;
-    final owed = pricePerKm == null ? null : pricePerKm * car.kmDriven;
+    final owed = _owed(car, price);
 
     String euro(double? value) =>
         value == null ? '–' : '€${value.toStringAsFixed(2)}';
