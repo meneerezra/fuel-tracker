@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/authentication.dart';
 import 'package:fuel_tracker/secure_storage.dart';
+import 'package:fuel_tracker/server_settings_page.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -59,11 +60,7 @@ class SettingsPage extends StatelessWidget {
                 );
               },
             ),
-            const ListTile(
-              leading: Icon(Icons.storage),
-              title: Text('Server settings'),
-            ),
-            _UserIdTile(storage: storage, authStorage: authStorage),
+            _AccountSection(storage: storage, authStorage: authStorage),
           ],
         ),
       ),
@@ -71,18 +68,19 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Shows the user ID others need to share a car with this user.
-class _UserIdTile extends StatefulWidget {
+/// Shows the user ID others need to share a car with this user, and the
+/// server settings for superusers.
+class _AccountSection extends StatefulWidget {
   final StorageService storage;
   final AuthStorage authStorage;
 
-  const _UserIdTile({required this.storage, required this.authStorage});
+  const _AccountSection({required this.storage, required this.authStorage});
 
   @override
-  State<_UserIdTile> createState() => _UserIdTileState();
+  State<_AccountSection> createState() => _AccountSectionState();
 }
 
-class _UserIdTileState extends State<_UserIdTile> {
+class _AccountSectionState extends State<_AccountSection> {
   late Future<User> _user = _load();
 
   Future<User> _load() async {
@@ -98,7 +96,7 @@ class _UserIdTileState extends State<_UserIdTile> {
       future: _user,
       builder: (context, snapshot) {
         final user = snapshot.data;
-        return ListTile(
+        final idTile = ListTile(
           leading: const Icon(Icons.badge_outlined),
           title: const Text('Your user ID'),
           subtitle: Text(
@@ -124,6 +122,28 @@ class _UserIdTileState extends State<_UserIdTile> {
             ScaffoldMessenger.of(context)
                 .showSnackBar(const SnackBar(content: Text('User ID copied')));
           },
+        );
+
+        return Column(
+          children: [
+            idTile,
+            if (user != null && user.isSuperuser)
+              ListTile(
+                leading: const Icon(Icons.storage),
+                title: const Text('Server settings'),
+                subtitle: const Text('All accounts and cars'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ServerSettingsPage(
+                      storage: widget.storage,
+                      authStorage: widget.authStorage,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );

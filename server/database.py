@@ -37,6 +37,17 @@ def get_user_by_id(id: int) -> User | None:
     with Session(engine) as session:
         return session.get(User, id)
 
+def delete_user(user_id: int):
+    """Deletes the user and the cars they own. Shares are removed too."""
+    with Session(engine) as session:
+        user = session.get(User, user_id)
+        if user is None:
+            return
+        for car in user.owned_cars:
+            session.delete(car)
+        session.delete(user)
+        session.commit()
+
 def get_shared_users(car_id: int) -> list[User]:
     with Session(engine) as session:
         query = (
@@ -76,6 +87,30 @@ def get_user_by_auth_token(auth_token: int) -> User | None:
          )
         user = session.exec(query).first() 
         return user
+
+def get_all_users() -> list[User]:
+    with Session(engine) as session:
+        query = (
+            select(User).
+            options(
+                selectinload(cast(InstrumentedAttribute, User.shared_cars)),
+                selectinload(cast(InstrumentedAttribute, User.owned_cars)),
+            ).
+            order_by(cast(InstrumentedAttribute, User.id))
+        )
+        return list(session.exec(query).all())
+
+def get_user_with_cars(user_id: int) -> User | None:
+    with Session(engine) as session:
+        query = (
+            select(User).
+            where(User.id == user_id).
+            options(
+                selectinload(cast(InstrumentedAttribute, User.shared_cars)),
+                selectinload(cast(InstrumentedAttribute, User.owned_cars)),
+            )
+        )
+        return session.exec(query).first()
 
 def get_current_user(
         credentials: HTTPAuthorizationCredentials, 

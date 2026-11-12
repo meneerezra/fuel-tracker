@@ -64,7 +64,11 @@ All endpoints need an `Authorization: Bearer <16-digit token>` header.
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/v1/users/me` | Current user with owned and shared cars |
+| `GET` | `/v1/users/` | All users with their cars (superuser only) |
 | `POST` | `/v1/users/` | Create a user (superuser only) |
+| `PUT` | `/v1/users/{user_id}` | Rename a user (superuser only) |
+| `GET` | `/v1/users/{user_id}/token` | View a user's auth token (superuser only) |
+| `DELETE` | `/v1/users/{user_id}` | Delete a user and the cars they own (superuser only, not your own account) |
 | `POST` | `/v1/cars/` | Create a car |
 | `GET` | `/v1/cars/{car_id}` | Get a car |
 | `PUT` | `/v1/cars/` | Edit a car |
@@ -74,7 +78,7 @@ All endpoints need an `Authorization: Bearer <16-digit token>` header.
 | `POST` | `/v1/cars/{car_id}/shares` | Share the car with a user ID (owner only) |
 | `DELETE` | `/v1/cars/{car_id}/shares/{user_id}` | Stop sharing. The owner can remove anyone, a shared user can remove themselves |
 
-Users a car is shared with can only view it and get its price. Only the owner can change the car, share it or delete it.
+Users a car is shared with can only view it and get its price. Only the owner can change the car, share it or delete it. Superusers have owner rights on every car, and can see all accounts and cars in the app under **Settings > Server settings**.
 
 ## App
 Requirements: [Flutter](https://docs.flutter.dev/get-started/install) (Dart SDK 3.13+).

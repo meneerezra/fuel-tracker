@@ -58,3 +58,73 @@ def view_current_user(
         raise HTTPException(status_code=401, detail="Access denied")
     return current_user
 
+
+@router.get("/", response_model=list[UserOut])
+def view_all_users(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> list[User]:
+    """All users with their cars. Superuser only, auth tokens are not included."""
+    current_user = database.get_current_user(credentials)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Access denied user does not exist")
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=401, detail="Access denied not enough permissions")
+    return database.get_all_users()
+
+def _require_superuser(credentials: HTTPAuthorizationCredentials) -> User:
+    current_user = database.get_current_user(credentials)
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Access denied user does not exist")
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=401, detail="Access denied not enough permissions")
+    return current_user
+
+def _get_user_or_404(user_id: int) -> User:
+    user = database.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User does not exist")
+    return user
+
+class RenameUser(BaseModel):
+    name: str
+
+@router.put("/{user_id}", response_model=UserOut)
+def rename_user(
+        user_id: int,
+        body: RenameUser,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> User:
+    """Superuser only."""
+    _require_superuser(credentials)
+    user = _get_user_or_404(user_id)
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    user.name = name
+    database.save_user(user)
+    return database.get_user_with_cars(user_id)
+
+class UserToken(BaseModel):
+    auth_token: int
+
+@router.get("/{user_id}/token")
+def view_user_token(
+        user_id: int,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> UserToken:
+    """Superuser only."""
+    _require_superuser(credentials)
+    user = _get_user_or_404(user_id)
+    return UserToken(auth_token=user.auth_token)
+
+@router.delete("/{user_id}")
+def delete_user(
+        user_id: int,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ):
+    """Superuser only. Also deletes the cars the user owns."""
+    current_user = _require_superuser(credentials)
+    if current_user.id == user_id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    _get_user_or_404(user_id)
+    database.delete_user(user_id)

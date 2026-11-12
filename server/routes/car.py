@@ -16,7 +16,8 @@ router = APIRouter(prefix="/cars", tags=["cars"])
 security = HTTPBearer()
 
 def _owns(user, car: Car) -> bool:
-    return any(owned.id == car.id for owned in user.owned_cars)
+    """Superusers have owner rights on every car."""
+    return user.is_superuser or any(owned.id == car.id for owned in user.owned_cars)
 
 def _can_use(user, car: Car) -> bool:
     """Owners and users the car is shared with can view it."""
@@ -182,8 +183,8 @@ def share_car(
         raise HTTPException(404, "Car does not exist")
     if not _owns(user, car):
         raise HTTPException(401, "Access denied")
-    if share.user_id == user.id:
-        raise HTTPException(400, "You already own this car")
+    if share.user_id == car.owner_id:
+        raise HTTPException(400, "This user already owns this car")
     if database.get_user_by_id(share.user_id) is None:
         raise HTTPException(404, "User does not exist")
 

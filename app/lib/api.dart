@@ -99,6 +99,7 @@ class User {
     required this.isSuperuser,
     required this.sharedCars,
     required this.ownedCars,
+    this.authToken,
   });
 
   final int id;
@@ -107,15 +108,21 @@ class User {
   final List<Car> sharedCars;
   final List<Car> ownedCars;
 
+  /// Only sent when a user is created.
+  final int? authToken;
+
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: (json['id'] as num).toInt(),
     name: json['name'] as String?,
     isSuperuser: json['is_superuser'] as bool,
     sharedCars: _carsFromJson(json['shared_cars']),
     ownedCars: _carsFromJson(json['owned_cars']),
+    authToken: (json['auth_token'] as num?)?.toInt(),
   );
 
   static List<Car> _carsFromJson(Object? json) {
+    // A created user is returned without cars.
+    if (json == null) return [];
     return (json as List<dynamic>)
         .map((car) => Car.fromJson(car as Map<String, dynamic>))
         .toList();
@@ -190,6 +197,15 @@ class Api {
   }
 
   Future<User> me() => _getUser('/users/me');
+
+  /// All users with their cars. Superuser only.
+  Future<List<User>> allUsers() async {
+    final response = await http.get(_uri('/users/'), headers: _headers);
+    _ensureOk(response);
+    return (jsonDecode(response.body) as List<dynamic>)
+        .map((user) => User.fromJson(user as Map<String, dynamic>))
+        .toList();
+  }
 
   Future<User> _getUser(String path) async {
     final response = await http.get(_uri(path), headers: _headers);
@@ -302,6 +318,36 @@ class Api {
   Future<List<Car>> ownedCars() async {
     final user = await me();
     return user.ownedCars;
+  }
+
+  /// Superuser only.
+  Future<void> renameUser(int userId, String name) async {
+    final response = await http.put(
+      _uri('/users/$userId'),
+      headers: _headers,
+      body: jsonEncode({'name': name}),
+    );
+    _ensureOk(response);
+  }
+
+  /// Superuser only.
+  Future<int> userToken(int userId) async {
+    final response = await http.get(
+      _uri('/users/$userId/token'),
+      headers: _headers,
+    );
+    _ensureOk(response);
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return (body['auth_token'] as num).toInt();
+  }
+
+  /// Superuser only. Also deletes the cars the user owns.
+  Future<void> deleteUser(int userId) async {
+    final response = await http.delete(
+      _uri('/users/$userId'),
+      headers: _headers,
+    );
+    _ensureOk(response);
   }
 
   Future<User> createUser({
