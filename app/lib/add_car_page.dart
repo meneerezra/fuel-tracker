@@ -22,7 +22,7 @@ class _AddCarPageState extends State<AddCarPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _consumption = TextEditingController();
-  final _threshold = TextEditingController(text: '500');
+  final _threshold = TextEditingController(text: '100');
   final _country = TextEditingController(text: 'NL');
   FuelType _fuelType = FuelType.e95;
   bool _saving = false;
