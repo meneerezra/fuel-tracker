@@ -6,7 +6,7 @@ import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/server_settings_page.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final ThemeMode mode;
   final ValueChanged<ThemeMode> onModeChanged;
   final StorageService storage;
@@ -20,9 +20,18 @@ class SettingsPage extends StatelessWidget {
   });
 
   @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  // Bumped to reload the account, for example after logging in with another
+  // token.
+  int _accountReload = 0;
+
+  @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
-    final isDarkMode = mode == ThemeMode.dark;
+    final isDarkMode = widget.mode == ThemeMode.dark;
 
     return Scaffold(
       body: SafeArea(
@@ -40,7 +49,7 @@ class SettingsPage extends StatelessWidget {
               ),
               title: Text('Dark mode'),
               onChanged: (value) {
-                onModeChanged(value ? ThemeMode.dark : ThemeMode.light);
+                widget.onModeChanged(value ? ThemeMode.dark : ThemeMode.light);
               },
             ),
             const Divider(thickness: 1),
@@ -48,19 +57,24 @@ class SettingsPage extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.person),
               title: Text('Authentication'),
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => AuthenticationPage(
-                      storage: storage,
-                      authStorage: authStorage,
+                      storage: widget.storage,
+                      authStorage: widget.authStorage,
                     ),
                   ),
                 );
+                if (mounted) setState(() => _accountReload++);
               },
             ),
-            _AccountSection(storage: storage, authStorage: authStorage),
+            _AccountSection(
+              key: ValueKey(_accountReload),
+              storage: widget.storage,
+              authStorage: widget.authStorage,
+            ),
           ],
         ),
       ),
@@ -74,7 +88,11 @@ class _AccountSection extends StatefulWidget {
   final StorageService storage;
   final AuthStorage authStorage;
 
-  const _AccountSection({required this.storage, required this.authStorage});
+  const _AccountSection({
+    super.key,
+    required this.storage,
+    required this.authStorage,
+  });
 
   @override
   State<_AccountSection> createState() => _AccountSectionState();
@@ -126,7 +144,6 @@ class _AccountSectionState extends State<_AccountSection> {
 
         return Column(
           children: [
-            idTile,
             if (user != null && user.isSuperuser)
               ListTile(
                 leading: const Icon(Icons.storage),
@@ -143,6 +160,7 @@ class _AccountSectionState extends State<_AccountSection> {
                   ),
                 ),
               ),
+            idTile,
           ],
         );
       },
