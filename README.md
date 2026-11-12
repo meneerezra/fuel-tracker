@@ -2,12 +2,14 @@
 The idea of this app to track how much km I have driven. I then convert it to fuel in liters and calculate how much money it cost so I can pay my dad back when I drive his car. My dad can also look at this information. It uses a 16 digit number for authentication inspired by Mullvad VPN. I chose it because it is easier then logging in for my father every 2 weeks.
 
 ## Features
-- [ ] App with all features
-- [ ] Live tracking
+- [x] App with all features
+- [x] Live tracking with GPS
 - [x] Get weekly fuel price
 - [x] Multiple cars per user
-- [x] Share cars between users
+- [x] Share cars between users (view only)
 - [x] Price per km and price per threshold (for example: what 100 km costs)
+- [x] Amount owed and a "Paid" button that resets the trip
+- [x] Server settings for superusers: manage all accounts and cars
 - [x] Light and dark mode
 
 ## How it works
@@ -21,6 +23,8 @@ price_per_threshold = price_per_km * km_threshold
 ```
 
 Supported fuel types: `diesel` and `e95` (petrol).
+
+The amount owed is `fuel_price * consumption / 100 * km_driven`. After paying, tap **Paid** to reset the trip (`km_driven`) to 0. The odometer (`total_km_driven`) is kept.
 
 ## Project structure
 ```
@@ -38,6 +42,14 @@ uv run fastapi dev main.py
 ```
 
 The API runs on `http://localhost:8000`. Interactive docs are at `http://localhost:8000/docs`.
+
+`fastapi dev` only listens on this computer. To reach the server from a phone on the same network, listen on all interfaces and use the computer's local IP in the app, for example `http://192.168.1.10:8000`:
+
+```sh
+uv run fastapi dev main.py --host 0.0.0.0
+```
+
+For a server that keeps running, use `uv run fastapi run main.py --host 0.0.0.0` instead of `fastapi dev`.
 
 On first start the server creates `database.db` and a superuser called "First admin". Its 16-digit auth token is stored in the `user` table. Use this token to create more users.
 
@@ -80,6 +92,17 @@ All endpoints need an `Authorization: Bearer <16-digit token>` header.
 
 Users a car is shared with can only view it and get its price. Only the owner can change the car, share it or delete it. Superusers have owner rights on every car, and can see all accounts and cars in the app under **Settings > Server settings**.
 
+Cars you cannot see return `404`, the same as cars that do not exist.
+
+Input limits (`422` when not met):
+
+| Field | Limit |
+| --- | --- |
+| `name` | 1 to 100 characters |
+| `km_threshold`, `km_driven`, `total_km_driven` | 0 to 10,000,000, decimals allowed |
+| `consumption` | 0 to 100 liters per 100 km |
+| `country_code` | 2 letters |
+
 ## App
 Requirements: [Flutter](https://docs.flutter.dev/get-started/install) (Dart SDK 3.13+).
 
@@ -89,7 +112,27 @@ flutter pub get
 flutter run
 ```
 
-In the app, go to **Settings > Authentication** and fill in the server URL and your auth token. The token is stored in secure storage.
+In the app, go to **Settings > Authentication** and fill in the server URL and your auth token. Include `http://` in the URL, without it the app uses `https://`. The token is stored in secure storage.
+
+### Tabs
+- **Current car**: the car marked with a star in the Cars tab. Shows the trip, amount owed, prices, the km counter and GPS trips.
+- **Cars**: owned and shared cars with search. Tap the star to make a car the current car, tap **Add car** to create one.
+- **Settings**: dark mode, authentication and your user ID. Superusers also see **Server settings**.
+
+### Sharing
+To share a car, open it and tap **Share**, then enter the other user's ID. Users find their ID under **Settings > Your user ID**.
+
+### GPS trips
+On a car you own, tap **Start** to measure a trip with GPS. Tracking keeps running while the screen is locked, with a notification. Tap **Stop** to see the distance and time, correct the km if needed, and add them to the car or discard the trip.
+
+- GPS fixes less accurate than 30 m are ignored. Movement smaller than the GPS accuracy (at least 5 m) is treated as drift, so standing still does not add km.
+- The trip is kept in memory. It is lost when Android closes the app.
+- In debug builds every GPS fix is logged with a `[Trip]` prefix (`adb logcat -s flutter`).
+
+## Security
+- The app talks to the server over plain HTTP (`usesCleartextTraffic`), so the auth token is sent unencrypted. This is fine on a home network. Put the server behind HTTPS before exposing it to the internet.
+- Auth tokens are stored unencrypted in `database.db`, so superusers can view them. Keep this file private.
+- `/docs` remembers the token in the browser (`persistAuthorization`). Only use it on your own computer.
 
 ## Credits
 Fuel prices are provided by [fuel-prices.eu](https://www.fuel-prices.eu).
