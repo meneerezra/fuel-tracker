@@ -258,7 +258,7 @@ class _CarTile extends StatelessWidget {
       title: Text(car.name),
       subtitle: Text(
         '${car.fuelType.value} · '
-        '${car.kmDriven.toStringAsFixed(0)} km driven',
+        '${formatKm(car.kmDriven)} km driven',
       ),
       trailing: IconButton(
         tooltip: isCurrent ? 'Current car' : 'Set as current car',

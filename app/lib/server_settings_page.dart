@@ -495,7 +495,7 @@ class _UserPageState extends State<_UserPage> {
     return ListTile(
       leading: const Icon(Icons.directions_car_outlined),
       title: Text(car.name),
-      subtitle: Text('${car.kmDriven.toStringAsFixed(0)} km driven'),
+      subtitle: Text('${formatKm(car.kmDriven)} km driven'),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _openCar(car),
     );

@@ -6,6 +6,7 @@ import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/share_car_page.dart';
 import 'package:fuel_tracker/storage_service.dart';
+import 'package:fuel_tracker/trip_tracker.dart';
 
 class CarPage extends StatefulWidget {
   final Car car;
@@ -126,7 +127,7 @@ class _CarPageState extends State<CarPage> {
     }
     if (!mounted) return;
     final owed = _owed(_car, price);
-    final km = _car.kmDriven.toStringAsFixed(0);
+    final km = formatKm(_car.kmDriven);
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -388,6 +389,8 @@ class _CarPageState extends State<CarPage> {
             ),
             if (widget.isOwner) ...[
               const SizedBox(height: 16),
+              _TripCard(carId: _car.id!, enabled: !_saving, onAdd: _addKm),
+              const SizedBox(height: 16),
               _AddKmCard(enabled: !_saving, onAdd: _addKm),
             ],
             const SizedBox(height: 24),
@@ -396,7 +399,7 @@ class _CarPageState extends State<CarPage> {
               icon: Icons.route,
               title: 'Trip',
               subtitle: 'Driven since last payment',
-              value: '${_car.kmDriven.toStringAsFixed(0)} km',
+              value: '${formatKm(_car.kmDriven)} km',
               onTap: _saving || !widget.isOwner
                   ? null
                   : () async {
@@ -404,6 +407,7 @@ class _CarPageState extends State<CarPage> {
                         title: 'Trip',
                         initial: _car.kmDriven,
                         suffix: 'km',
+                        decimals: 1,
                       );
                       if (km != null) await _save(_car.copyWith(kmDriven: km));
                     },
@@ -412,7 +416,7 @@ class _CarPageState extends State<CarPage> {
               icon: Icons.speed,
               title: 'Odometer',
               subtitle: 'Total driven',
-              value: '${_car.totalKmDriven.toStringAsFixed(0)} km',
+              value: '${formatKm(_car.totalKmDriven)} km',
               onTap: _saving || !widget.isOwner
                   ? null
                   : () async {
@@ -420,6 +424,7 @@ class _CarPageState extends State<CarPage> {
                         title: 'Odometer',
                         initial: _car.totalKmDriven,
                         suffix: 'km',
+                        decimals: 1,
                       );
                       if (km != null) {
                         await _save(_car.copyWith(totalKmDriven: km));
@@ -430,7 +435,7 @@ class _CarPageState extends State<CarPage> {
               icon: Icons.flag_outlined,
               title: 'Threshold',
               subtitle: 'Pay back every',
-              value: '${_car.kmTreshold.toStringAsFixed(0)} km',
+              value: '${formatKm(_car.kmTreshold)} km',
               onTap: _saving || !widget.isOwner
                   ? null
                   : () async {
@@ -438,6 +443,7 @@ class _CarPageState extends State<CarPage> {
                         title: 'Threshold',
                         initial: _car.kmTreshold,
                         suffix: 'km',
+                        decimals: 1,
                       );
                       if (km != null) {
                         await _save(_car.copyWith(kmTreshold: km));
@@ -527,6 +533,12 @@ class _CarPageState extends State<CarPage> {
   }
 }
 
+/// Formats km with one decimal, without a trailing ".0".
+String formatKm(double km) {
+  final text = km.toStringAsFixed(1);
+  return text.endsWith('.0') ? text.substring(0, text.length - 2) : text;
+}
+
 /// Money owed for the km driven since the last payment.
 double? _owed(Car car, CarPrice? price) {
   final fuelPrice = price?.fuelPrice;
@@ -575,8 +587,8 @@ class _ThresholdBar extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Text(
-          '${car.kmDriven.toStringAsFixed(0)} / '
-          '${car.kmTreshold.toStringAsFixed(0)} km',
+          '${formatKm(car.kmDriven)} / '
+          '${formatKm(car.kmTreshold)} km',
           style: theme.textTheme.titleMedium,
         ),
       ],
@@ -670,7 +682,7 @@ class _PriceRow extends StatelessWidget {
         const SizedBox(width: 12),
         _PriceTile(
           icon: Icons.flag_outlined,
-          label: 'Per ${car.kmTreshold.toStringAsFixed(0)} km',
+          label: 'Per ${formatKm(car.kmTreshold)} km',
           value: euro(price?.pricePerThreshold),
         ),
       ],
@@ -795,7 +807,7 @@ class _AddKmCard extends StatefulWidget {
 class _AddKmCardState extends State<_AddKmCard> {
   static const _quickAmounts = [5, 10, 25, 50];
 
-  int _km = 0;
+  double _km = 0;
   Timer? _repeat;
 
   @override
@@ -805,7 +817,7 @@ class _AddKmCardState extends State<_AddKmCard> {
   }
 
   void _change(int delta) {
-    final next = (_km + delta).clamp(0, 99999);
+    final next = (_km + delta).clamp(0.0, 99999.0);
     if (next == _km) return;
     HapticFeedback.selectionClick();
     setState(() => _km = next);
@@ -830,15 +842,16 @@ class _AddKmCardState extends State<_AddKmCard> {
     final km = await _showNumberDialog(
       context,
       title: 'Add km',
-      initial: _km.toDouble(),
+      initial: _km,
       suffix: 'km',
+      decimals: 1,
     );
-    if (km != null) setState(() => _km = km.round());
+    if (km != null) setState(() => _km = km);
   }
 
   Future<void> _submit() async {
     final km = _km;
-    final added = await widget.onAdd(km.toDouble());
+    final added = await widget.onAdd(km);
     if (added && mounted) setState(() => _km = 0);
   }
 
@@ -883,7 +896,7 @@ class _AddKmCardState extends State<_AddKmCard> {
                         transitionBuilder: (child, animation) =>
                             ScaleTransition(scale: animation, child: child),
                         child: Text(
-                          '$_km',
+                          formatKm(_km),
                           key: ValueKey(_km),
                           style: theme.textTheme.displayMedium?.copyWith(
                             fontWeight: FontWeight.w600,
@@ -933,7 +946,7 @@ class _AddKmCardState extends State<_AddKmCard> {
                 child: FilledButton.icon(
                   onPressed: widget.enabled && _km > 0 ? _submit : null,
                   icon: const Icon(Icons.check),
-                  label: Text('Add $_km km'),
+                  label: Text('Add ${formatKm(_km)} km'),
                 ),
               ),
             ],
@@ -1106,6 +1119,292 @@ class _EditDialogState extends State<_EditDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(onPressed: _submit, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
+/// Starts and stops a GPS trip. At the end the driven km can be checked and
+/// corrected before they are added.
+class _TripCard extends StatefulWidget {
+  final int carId;
+  final bool enabled;
+  final Future<bool> Function(double km) onAdd;
+
+  const _TripCard({
+    required this.carId,
+    required this.enabled,
+    required this.onAdd,
+  });
+
+  @override
+  State<_TripCard> createState() => _TripCardState();
+}
+
+class _TripCardState extends State<_TripCard> {
+  final _tracker = TripTracker.instance;
+  Timer? _clock;
+
+  @override
+  void initState() {
+    super.initState();
+    _tracker.addListener(_onTrackerChanged);
+    _onTrackerChanged();
+  }
+
+  @override
+  void dispose() {
+    _tracker.removeListener(_onTrackerChanged);
+    _clock?.cancel();
+    super.dispose();
+  }
+
+  bool get _isThisCar => _tracker.carId == widget.carId;
+
+  void _onTrackerChanged() {
+    // Tick every second so the duration stays up to date.
+    if (_isThisCar) {
+      _clock ??= Timer.periodic(
+        const Duration(seconds: 1),
+        (_) => setState(() {}),
+      );
+    } else {
+      _clock?.cancel();
+      _clock = null;
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _start() async {
+    try {
+      await _tracker.start(widget.carId);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
+  Future<void> _stop() async {
+    final result = await showDialog<_EndTripResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          _EndTripDialog(km: _tracker.km, elapsed: _tracker.elapsed),
+    );
+    if (result == null) return; // Keep tracking.
+
+    if (result.discard) {
+      _tracker.stop();
+      return;
+    }
+    // Only stop when the km are saved, so a failed save loses nothing.
+    final added = await widget.onAdd(result.km);
+    if (added) _tracker.stop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tracking = _isThisCar;
+    final otherCar = _tracker.isTracking && !tracking;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: tracking ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            tracking ? Icons.gps_fixed : Icons.gps_not_fixed,
+            color: tracking
+                ? scheme.onPrimaryContainer
+                : scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: tracking
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        // Meters on short trips, so walking tests show progress.
+                        _tracker.km < 1
+                            ? '${(_tracker.km * 1000).toStringAsFixed(0)} m'
+                            : '${_tracker.km.toStringAsFixed(1)} km',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                      Text(
+                        'Trip running · ${_formatDuration(_tracker.elapsed)}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                        ),
+                      ),
+                      // GPS debug info.
+                      Text(
+                        _tracker.lastError ??
+                            (_tracker.fixes == 0 &&
+                                    _tracker.elapsed.inSeconds > 15
+                                ? 'No GPS fix yet, check the logs'
+                                : null) ??
+                            [
+                              '${_tracker.fixes} fixes',
+                              '${_tracker.ignoredFixes} ignored',
+                              if (_tracker.lastAccuracy != null)
+                                '±${_tracker.lastAccuracy!.toStringAsFixed(0)} m',
+                            ].join(' · '),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: _tracker.lastError != null
+                              ? scheme.error
+                              : scheme.onPrimaryContainer.withValues(
+                                  alpha: 0.7,
+                                ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('GPS trip', style: theme.textTheme.titleMedium),
+                      Text(
+                        otherCar
+                            ? 'A trip is running for another car'
+                            : 'Measure the km while you drive',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          const SizedBox(width: 12),
+          if (tracking)
+            FilledButton.icon(
+              onPressed: widget.enabled ? _stop : null,
+              icon: const Icon(Icons.stop),
+              label: const Text('Stop'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: widget.enabled && !otherCar ? _start : null,
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Start'),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatDuration(Duration duration) {
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+}
+
+class _EndTripResult {
+  const _EndTripResult.add(this.km) : discard = false;
+  const _EndTripResult.discard() : km = 0, discard = true;
+
+  final double km;
+  final bool discard;
+}
+
+class _EndTripDialog extends StatefulWidget {
+  final double km;
+  final Duration elapsed;
+
+  const _EndTripDialog({required this.km, required this.elapsed});
+
+  @override
+  State<_EndTripDialog> createState() => _EndTripDialogState();
+}
+
+class _EndTripDialogState extends State<_EndTripDialog> {
+  late final _km = TextEditingController(text: widget.km.toStringAsFixed(1));
+  String? _error;
+
+  @override
+  void dispose() {
+    _km.dispose();
+    super.dispose();
+  }
+
+  void _add() {
+    final km = _parseNumber(_km.text);
+    if (km == null || km < 0) {
+      setState(() => _error = 'Enter a number');
+      return;
+    }
+    Navigator.pop(context, _EndTripResult.add(km));
+  }
+
+  Future<void> _discard() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Discard trip?'),
+        content: const Text('The measured km are not added to the car.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      Navigator.pop(context, const _EndTripResult.discard());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      icon: const Icon(Icons.flag),
+      title: const Text('End trip?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'You drove ${widget.km.toStringAsFixed(1)} km in '
+            '${_formatDuration(widget.elapsed)}. Correct the km if needed.',
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _km,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onSubmitted: (_) => _add(),
+            decoration: InputDecoration(
+              labelText: 'Distance',
+              suffixText: 'km',
+              errorText: _error,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: _discard, child: const Text('Discard')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Keep driving'),
+        ),
+        FilledButton(onPressed: _add, child: const Text('Add')),
       ],
     );
   }
