@@ -12,8 +12,8 @@ class CarPage extends StatefulWidget {
   final StorageService storage;
   final AuthStorage authStorage;
 
-  /// Only the owner can change the car settings. Users the car is shared with
-  /// can still log km.
+  /// Only the owner can change the car. Users the car is shared with can only
+  /// view it.
   final bool isOwner;
 
   /// The logged in user, needed to leave a shared car.
@@ -324,8 +324,10 @@ class _CarPageState extends State<CarPage> {
                 error: snapshot.error,
               ),
             ),
-            const SizedBox(height: 16),
-            _AddKmCard(enabled: !_saving, onAdd: _addKm),
+            if (widget.isOwner) ...[
+              const SizedBox(height: 16),
+              _AddKmCard(enabled: !_saving, onAdd: _addKm),
+            ],
             const SizedBox(height: 24),
             const Divider(height: 1),
             _InfoTile(
@@ -333,7 +335,7 @@ class _CarPageState extends State<CarPage> {
               title: 'Trip',
               subtitle: 'Driven since last payment',
               value: '${_car.kmDriven.toStringAsFixed(0)} km',
-              onTap: _saving
+              onTap: _saving || !widget.isOwner
                   ? null
                   : () async {
                       final km = await _editNumber(
@@ -349,7 +351,7 @@ class _CarPageState extends State<CarPage> {
               title: 'Odometer',
               subtitle: 'Total driven',
               value: '${_car.totalKmDriven.toStringAsFixed(0)} km',
-              onTap: _saving
+              onTap: _saving || !widget.isOwner
                   ? null
                   : () async {
                       final km = await _editNumber(
@@ -431,7 +433,7 @@ class _CarPageState extends State<CarPage> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.share_outlined),
                 title: Text('Share', style: theme.textTheme.titleMedium),
-                subtitle: const Text('Let others view this car and log km'),
+                subtitle: const Text('Let others view this car'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
                   context,

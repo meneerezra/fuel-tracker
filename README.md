@@ -74,7 +74,7 @@ All endpoints need an `Authorization: Bearer <16-digit token>` header.
 | `POST` | `/v1/cars/{car_id}/shares` | Share the car with a user ID (owner only) |
 | `DELETE` | `/v1/cars/{car_id}/shares/{user_id}` | Stop sharing. The owner can remove anyone, a shared user can remove themselves |
 
-Users a car is shared with can view it, get its price and change its km. Only the owner can change the other car settings, share it or delete it.
+Users a car is shared with can only view it and get its price. Only the owner can change the car, share it or delete it.
 
 ## App
 Requirements: [Flutter](https://docs.flutter.dev/get-started/install) (Dart SDK 3.13+).

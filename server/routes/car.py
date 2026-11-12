@@ -19,7 +19,7 @@ def _owns(user, car: Car) -> bool:
     return any(owned.id == car.id for owned in user.owned_cars)
 
 def _can_use(user, car: Car) -> bool:
-    """Owners and users the car is shared with can view it and log km."""
+    """Owners and users the car is shared with can view it."""
     return _owns(user, car) or any(shared.id == car.id for shared in user.shared_cars)
 
 @router.get("/{car_id}")
@@ -112,18 +112,17 @@ def edit_car(
     db_car = database.get_car_by_id(car.id)
     if not db_car:
         raise HTTPException(404, "Car does not exist")
-    if not _can_use(user, db_car):
+    # Users the car is shared with can only view it.
+    if not _owns(user, db_car):
         raise HTTPException(401, "Access denied")
 
+    db_car.name = car.name
+    db_car.km_treshold = car.km_threshold
     db_car.km_driven = car.km_driven
     db_car.total_km_driven = car.total_km_driven
-    # Only the owner can change the car settings.
-    if _owns(user, db_car):
-        db_car.name = car.name
-        db_car.km_treshold = car.km_threshold
-        db_car.consumption = car.consumption
-        db_car.fuel_type = car.fuel_type
-        db_car.country_code = car.country_code
+    db_car.consumption = car.consumption
+    db_car.fuel_type = car.fuel_type
+    db_car.country_code = car.country_code
     updated_car = database.save_car(db_car)
     return updated_car
 
