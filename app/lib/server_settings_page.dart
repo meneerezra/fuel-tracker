@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/car_page.dart';
+import 'package:fuel_tracker/search_field.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
@@ -24,12 +25,19 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
   List<User>? _users;
   int? _myId;
   Object? _error;
+  final _search = TextEditingController();
   String _query = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<Api> _api() => _createApi(widget.storage, widget.authStorage);
@@ -125,10 +133,9 @@ class _ServerSettingsPageState extends State<ServerSettingsPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: SearchBar(
+            child: SearchField(
+              controller: _search,
               hintText: 'Search name, ID or car',
-              leading: const Icon(Icons.search),
-              elevation: const WidgetStatePropertyAll(0),
               onChanged: (value) => setState(() => _query = value),
             ),
           ),

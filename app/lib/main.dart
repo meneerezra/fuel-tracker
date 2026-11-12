@@ -134,6 +134,7 @@ class _FuelTrackerState extends State<FuelTracker> {
         authStorage: widget.authStorage,
         currentCarId: _currentCarId,
         onCurrentCarChanged: _setCurrentCar,
+        isActive: currentIndex == 1,
       ),
       SettingsPage(
         authStorage: widget.authStorage,

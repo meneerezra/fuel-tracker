@@ -3,6 +3,7 @@ import 'package:fuel_tracker/add_car_page.dart';
 import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/car_page.dart';
 import 'package:fuel_tracker/home_page.dart';
+import 'package:fuel_tracker/search_field.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
@@ -13,12 +14,16 @@ class CarsPage extends StatefulWidget {
   final int? currentCarId;
   final ValueChanged<int> onCurrentCarChanged;
 
+  /// Whether this tab is shown. The search is cleared when the tab is left.
+  final bool isActive;
+
   const CarsPage({
     super.key,
     required this.storage,
     required this.authStorage,
     required this.currentCarId,
     required this.onCurrentCarChanged,
+    this.isActive = true,
   });
 
   @override
@@ -27,11 +32,31 @@ class CarsPage extends StatefulWidget {
 
 class _CarsPageState extends State<CarsPage> {
   late Future<User> _user;
+  final _search = TextEditingController();
+  String _query = '';
 
   @override
   void initState() {
     super.initState();
     _user = _loadUser();
+  }
+
+  @override
+  void didUpdateWidget(CarsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive && !widget.isActive) _clearSearch();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _clearSearch() {
+    _search.clear();
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _query = '');
   }
 
   Future<User> _loadUser() async {
@@ -47,6 +72,15 @@ class _CarsPageState extends State<CarsPage> {
       _user = future;
     });
     await future.then((_) {}, onError: (_) {});
+  }
+
+  /// Matches the car name, fuel type or country code.
+  bool _matches(Car car) {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return true;
+    return car.name.toLowerCase().contains(query) ||
+        car.fuelType.value.contains(query) ||
+        car.countryCode.toLowerCase() == query;
   }
 
   Future<void> _addCar() async {
@@ -92,62 +126,89 @@ class _CarsPageState extends State<CarsPage> {
         label: const Text('Add car'),
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: FutureBuilder<User>(
-            future: _user,
-            builder: (context, snapshot) {
-              // Keep showing the previous result while a refresh is running.
-              if (!snapshot.hasData && !snapshot.hasError) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return ListView(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.error_outline),
-                      title: Text(snapshot.error.toString()),
-                    ),
-                  ],
-                );
-              }
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: SearchField(
+                controller: _search,
+                hintText: 'Search cars',
+                onChanged: (value) => setState(() => _query = value),
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                child: FutureBuilder<User>(
+                  future: _user,
+                  builder: (context, snapshot) {
+                    // Keep showing the previous result while a refresh is running.
+                    if (!snapshot.hasData && !snapshot.hasError) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return ListView(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.error_outline),
+                            title: Text(snapshot.error.toString()),
+                          ),
+                        ],
+                      );
+                    }
 
-              final user = snapshot.data!;
-              final currentCarId = pickCurrentCar(
-                user,
-                widget.currentCarId,
-              )?.id;
+                    final user = snapshot.data!;
+                    final currentCarId = pickCurrentCar(
+                      user,
+                      widget.currentCarId,
+                    )?.id;
+                    final ownedCars = user.ownedCars.where(_matches).toList();
+                    final sharedCars = user.sharedCars.where(_matches).toList();
+                    final searching = _query.trim().isNotEmpty;
 
-              return ListView(
-                // Room for the add button.
-                padding: const EdgeInsets.only(bottom: 88),
-                children: [
-                  _SectionHeader('Owned'),
-                  if (user.ownedCars.isEmpty)
-                    const ListTile(title: Text('No owned cars')),
-                  for (final car in user.ownedCars)
-                    _CarTile(
-                      car: car,
-                      isCurrent: car.id == currentCarId,
-                      onTap: () =>
-                          _openCar(car, isOwner: true, userId: user.id),
-                      onFavorite: () => widget.onCurrentCarChanged(car.id!),
-                    ),
-                  _SectionHeader('Shared with me'),
-                  if (user.sharedCars.isEmpty)
-                    const ListTile(title: Text('No shared cars')),
-                  for (final car in user.sharedCars)
-                    _CarTile(
-                      car: car,
-                      isCurrent: car.id == currentCarId,
-                      onTap: () =>
-                          _openCar(car, isOwner: false, userId: user.id),
-                      onFavorite: () => widget.onCurrentCarChanged(car.id!),
-                    ),
-                ],
-              );
-            },
-          ),
+                    return ListView(
+                      // Room for the add button.
+                      padding: const EdgeInsets.only(bottom: 88),
+                      children: [
+                        _SectionHeader('Owned'),
+                        if (ownedCars.isEmpty)
+                          ListTile(
+                            title: Text(
+                              searching ? 'No matching cars' : 'No owned cars',
+                            ),
+                          ),
+                        for (final car in ownedCars)
+                          _CarTile(
+                            car: car,
+                            isCurrent: car.id == currentCarId,
+                            onTap: () =>
+                                _openCar(car, isOwner: true, userId: user.id),
+                            onFavorite: () =>
+                                widget.onCurrentCarChanged(car.id!),
+                          ),
+                        _SectionHeader('Shared with me'),
+                        if (sharedCars.isEmpty)
+                          ListTile(
+                            title: Text(
+                              searching ? 'No matching cars' : 'No shared cars',
+                            ),
+                          ),
+                        for (final car in sharedCars)
+                          _CarTile(
+                            car: car,
+                            isCurrent: car.id == currentCarId,
+                            onTap: () =>
+                                _openCar(car, isOwner: false, userId: user.id),
+                            onFavorite: () =>
+                                widget.onCurrentCarChanged(car.id!),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
