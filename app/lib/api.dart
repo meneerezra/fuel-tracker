@@ -41,6 +41,26 @@ class Car {
   final FuelType fuelType;
   final String countryCode;
 
+  Car copyWith({
+    String? name,
+    double? kmDriven,
+    double? kmTreshold,
+    double? totalKmDriven,
+    double? consumption,
+    FuelType? fuelType,
+    String? countryCode,
+  }) => Car(
+    id: id,
+    name: name ?? this.name,
+    ownerId: ownerId,
+    kmDriven: kmDriven ?? this.kmDriven,
+    kmTreshold: kmTreshold ?? this.kmTreshold,
+    totalKmDriven: totalKmDriven ?? this.totalKmDriven,
+    consumption: consumption ?? this.consumption,
+    fuelType: fuelType ?? this.fuelType,
+    countryCode: countryCode ?? this.countryCode,
+  );
+
   factory Car.fromJson(Map<String, dynamic> json) => Car(
     id: (json['id'] as num?)?.toInt(),
     name: json['name'] as String,
@@ -55,12 +75,18 @@ class Car {
 }
 
 class CarPrice {
-  const CarPrice({required this.pricePerKm, required this.pricePerThreshold});
+  const CarPrice({
+    this.fuelPrice,
+    required this.pricePerKm,
+    required this.pricePerThreshold,
+  });
 
+  final double? fuelPrice;
   final double pricePerKm;
   final double pricePerThreshold;
 
   factory CarPrice.fromJson(Map<String, dynamic> json) => CarPrice(
+    fuelPrice: (json['fuel_price'] as num?)?.toDouble(),
     pricePerKm: (json['price_per_km'] as num).toDouble(),
     pricePerThreshold: (json['price_per_threshold'] as num).toDouble(),
   );

@@ -15,6 +15,13 @@ from services.fuel_prices import (
 router = APIRouter(prefix="/cars", tags=["cars"])
 security = HTTPBearer()
 
+def _owns(user, car: Car) -> bool:
+    return any(owned.id == car.id for owned in user.owned_cars)
+
+def _can_use(user, car: Car) -> bool:
+    """Owners and users the car is shared with can view it and log km."""
+    return _owns(user, car) or any(shared.id == car.id for shared in user.shared_cars)
+
 @router.get("/{car_id}")
 def get_car(
         car_id: int,
@@ -24,7 +31,9 @@ def get_car(
     if user is None:
         raise HTTPException(401, "Access denied")
     car = database.get_car_by_id(car_id)
-    if car not in user.owned_cars:
+    if not car:
+        raise HTTPException(404, "Car does not exist")
+    if not _can_use(user, car):
         raise HTTPException(401, "Access denied")
 
     return car
@@ -49,6 +58,7 @@ def create_car(
     return db_car
 
 class GetPriceResult(BaseModel):
+    fuel_price: float
     price_per_km: float
     price_per_threshold: float
 
@@ -63,7 +73,7 @@ def get_price(
     car = database.get_car_by_id(car_id)
     if not car:
         raise HTTPException(404, "Car does not exist")
-    if car not in user.owned_cars:
+    if not _can_use(user, car):
         raise HTTPException(401, "Access denied")
     try:
         history = fetch_country_history(car.country_code)
@@ -79,7 +89,7 @@ def get_price(
     price_per_km = latest.price * car.consumption / 100
     price_per_threshold = price_per_km * car.km_treshold
     
-    return GetPriceResult(price_per_km=round(price_per_km,2),  price_per_threshold=round(price_per_threshold, 2))
+    return GetPriceResult(fuel_price=round(latest.price, 3), price_per_km=round(price_per_km,2),  price_per_threshold=round(price_per_threshold, 2))
 
 class EditCar(BaseModel):
     id: int
@@ -102,16 +112,18 @@ def edit_car(
     db_car = database.get_car_by_id(car.id)
     if not db_car:
         raise HTTPException(404, "Car does not exist")
-    if db_car not in user.owned_cars:
+    if not _can_use(user, db_car):
         raise HTTPException(401, "Access denied")
 
-    db_car.name = car.name
-    db_car.km_treshold = car.km_threshold
     db_car.km_driven = car.km_driven
     db_car.total_km_driven = car.total_km_driven
-    db_car.consumption = car.consumption
-    db_car.fuel_type = car.fuel_type
-    db_car.country_code = car.country_code
+    # Only the owner can change the car settings.
+    if _owns(user, db_car):
+        db_car.name = car.name
+        db_car.km_treshold = car.km_threshold
+        db_car.consumption = car.consumption
+        db_car.fuel_type = car.fuel_type
+        db_car.country_code = car.country_code
     updated_car = database.save_car(db_car)
     return updated_car
 

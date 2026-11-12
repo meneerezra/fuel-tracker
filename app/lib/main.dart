@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fuel_tracker/cars_page.dart';
 import 'package:fuel_tracker/home_page.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
@@ -88,6 +89,14 @@ class _FuelTrackerAppState extends State<FuelTrackerApp> {
 
 class _FuelTrackerState extends State<FuelTracker> {
   int currentIndex = 0;
+  late int? _currentCarId = widget.storage.getCurrentCarId();
+  // Bumped when the home tab opens so it shows the latest car data.
+  int _homeReloadToken = 0;
+
+  void _setCurrentCar(int carId) {
+    setState(() => _currentCarId = carId);
+    widget.storage.saveCurrentCarId(carId);
+  }
 
   Widget animatedIcon(IconData icon, int index, ColorScheme scheme) {
     final isSelected = currentIndex == index;
@@ -108,7 +117,18 @@ class _FuelTrackerState extends State<FuelTracker> {
     final scheme = Theme.of(context).colorScheme;
 
     final pages = [
-      HomePage(storage: widget.storage, authStorage: widget.authStorage),
+      HomePage(
+        storage: widget.storage,
+        authStorage: widget.authStorage,
+        currentCarId: _currentCarId,
+        reloadToken: _homeReloadToken,
+      ),
+      CarsPage(
+        storage: widget.storage,
+        authStorage: widget.authStorage,
+        currentCarId: _currentCarId,
+        onCurrentCarChanged: _setCurrentCar,
+      ),
       SettingsPage(
         authStorage: widget.authStorage,
         storage: widget.storage,
@@ -123,18 +143,24 @@ class _FuelTrackerState extends State<FuelTracker> {
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {
           setState(() {
+            if (index == 0 && currentIndex != 0) _homeReloadToken++;
             currentIndex = index;
           });
         },
         destinations: [
           NavigationDestination(
-            icon: animatedIcon(Icons.home, 0, scheme),
-            selectedIcon: animatedIcon(Icons.home, 0, scheme),
-            label: 'Home',
+            icon: animatedIcon(Icons.directions_car_outlined, 0, scheme),
+            selectedIcon: animatedIcon(Icons.directions_car, 0, scheme),
+            label: 'Current car',
           ),
           NavigationDestination(
-            icon: animatedIcon(Icons.settings_outlined, 1, scheme),
-            selectedIcon: animatedIcon(Icons.settings, 1, scheme),
+            icon: animatedIcon(Icons.garage_outlined, 1, scheme),
+            selectedIcon: animatedIcon(Icons.garage, 1, scheme),
+            label: 'Cars',
+          ),
+          NavigationDestination(
+            icon: animatedIcon(Icons.settings_outlined, 2, scheme),
+            selectedIcon: animatedIcon(Icons.settings, 2, scheme),
             label: 'Settings',
           ),
         ],

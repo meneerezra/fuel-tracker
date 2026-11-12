@@ -16,6 +16,14 @@ class StorageService {
     await _prefs.setString('serverUrl', serverUrl);
   }
 
+  int? getCurrentCarId() {
+    return _prefs.getInt('currentCarId');
+  }
+
+  Future<void> saveCurrentCarId(int carId) async {
+    await _prefs.setInt('currentCarId', carId);
+  }
+
   ThemeMode getDarkMode() {
     switch (_prefs.getString(_themeModeKey)) {
       case 'light':

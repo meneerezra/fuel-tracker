@@ -1,91 +1,117 @@
 import 'package:flutter/material.dart';
 import 'package:fuel_tracker/api.dart';
+import 'package:fuel_tracker/car_page.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
+/// Returns the car picked as current car. Falls back to the first owned car,
+/// then the first shared car.
+Car? pickCurrentCar(User user, int? currentCarId) {
+  final cars = [...user.ownedCars, ...user.sharedCars];
+  for (final car in cars) {
+    if (car.id == currentCarId) return car;
+  }
+  return cars.isEmpty ? null : cars.first;
+}
+
+/// Shows the current car.
 class HomePage extends StatefulWidget {
   final StorageService storage;
   final AuthStorage authStorage;
+  final int? currentCarId;
 
-  const HomePage({super.key, required this.storage, required this.authStorage});
+  /// Changes when the page should reload, for example when the tab opens.
+  final int reloadToken;
+
+  const HomePage({
+    super.key,
+    required this.storage,
+    required this.authStorage,
+    required this.currentCarId,
+    required this.reloadToken,
+  });
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  late Future<List<Car>> _ownedCars;
+  User? _user;
+  Object? _error;
 
   @override
   void initState() {
     super.initState();
-    _ownedCars = _loadOwnedCars();
+    _load();
   }
 
-  Future<List<Car>> _loadOwnedCars() async {
-    final token = await widget.authStorage.getAuthToken();
-    if (token == null) throw ApiException('Not logged in');
-    final api = Api(baseUrl: widget.storage.getServerUrl(), authToken: token);
-    return api.ownedCars();
+  @override
+  void didUpdateWidget(HomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentCarId != oldWidget.currentCarId ||
+        widget.reloadToken != oldWidget.reloadToken) {
+      _load();
+    }
   }
 
-  Future<void> _refresh() async {
-    final future = _loadOwnedCars();
-    setState(() {
-      _ownedCars = future;
-    });
-    await future.catchError((_) => <Car>[]);
+  Future<void> _load() async {
+    try {
+      final token = await widget.authStorage.getAuthToken();
+      if (token == null) throw ApiException('Not logged in');
+      final api = Api(baseUrl: widget.storage.getServerUrl(), authToken: token);
+      final user = await api.me();
+      if (!mounted) return;
+      setState(() {
+        _user = user;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _refresh,
-          child: FutureBuilder<List<Car>>(
-            future: _ownedCars,
-            builder: (context, snapshot) {
-              // Keep showing the previous result while a refresh is running.
-              if (!snapshot.hasData && !snapshot.hasError) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return ListView(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.error_outline),
-                      title: Text(snapshot.error.toString()),
-                    ),
-                  ],
-                );
-              }
+    final user = _user;
 
-              final cars = snapshot.data!;
-              if (cars.isEmpty) {
-                return ListView(
-                  children: const [ListTile(title: Text('No owned cars'))],
-                );
-              }
+    // Keep showing the previous car while a reload is running.
+    if (user == null && _error == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-              return ListView.builder(
-                itemCount: cars.length,
-                itemBuilder: (context, index) {
-                  final car = cars[index];
-                  return ListTile(
-                    leading: const Icon(Icons.directions_car),
-                    title: Text(car.name),
-                    subtitle: Text(
-                      '${car.fuelType.value} · '
-                      '${car.kmDriven.toStringAsFixed(0)} km driven',
-                    ),
-                  );
-                },
-              );
-            },
+    final car = user == null ? null : pickCurrentCar(user, widget.currentCarId);
+    if (car == null) {
+      return Scaffold(
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              children: [
+                if (_error != null)
+                  ListTile(
+                    leading: const Icon(Icons.error_outline),
+                    title: Text(_error.toString()),
+                  )
+                else
+                  const ListTile(
+                    leading: Icon(Icons.directions_car),
+                    title: Text('No cars yet'),
+                    subtitle: Text('Add or share a car to see it here'),
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    return CarPage(
+      key: ValueKey(car.id),
+      car: car,
+      storage: widget.storage,
+      authStorage: widget.authStorage,
+      isOwner: car.ownerId == user!.id,
     );
   }
 }
