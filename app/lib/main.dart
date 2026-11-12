@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fuel_tracker/cars_page.dart';
@@ -98,13 +100,17 @@ class _FuelTrackerState extends State<FuelTracker> {
     widget.storage.saveCurrentCarId(carId);
   }
 
-  Widget animatedIcon(IconData icon, int index, ColorScheme scheme) {
+  Widget animatedIcon(
+    IconData icon,
+    int index,
+    ColorScheme scheme, {
+    _NavAnimation animation = _NavAnimation.spin,
+  }) {
     final isSelected = currentIndex == index;
 
-    return AnimatedRotation(
-      turns: isSelected ? 1 : 0,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+    return _NavIcon(
+      selected: isSelected,
+      animation: animation,
       child: Icon(
         icon,
         color: isSelected ? scheme.primary : scheme.onSurfaceVariant,
@@ -149,13 +155,33 @@ class _FuelTrackerState extends State<FuelTracker> {
         },
         destinations: [
           NavigationDestination(
-            icon: animatedIcon(Icons.directions_car_outlined, 0, scheme),
-            selectedIcon: animatedIcon(Icons.directions_car, 0, scheme),
+            icon: animatedIcon(
+              Icons.directions_car_outlined,
+              0,
+              scheme,
+              animation: _NavAnimation.drive,
+            ),
+            selectedIcon: animatedIcon(
+              Icons.directions_car,
+              0,
+              scheme,
+              animation: _NavAnimation.drive,
+            ),
             label: 'Current car',
           ),
           NavigationDestination(
-            icon: animatedIcon(Icons.garage_outlined, 1, scheme),
-            selectedIcon: animatedIcon(Icons.garage, 1, scheme),
+            icon: animatedIcon(
+              Icons.list_outlined,
+              1,
+              scheme,
+              animation: _NavAnimation.flip,
+            ),
+            selectedIcon: animatedIcon(
+              Icons.list,
+              1,
+              scheme,
+              animation: _NavAnimation.flip,
+            ),
             label: 'Cars',
           ),
           NavigationDestination(
@@ -166,5 +192,95 @@ class _FuelTrackerState extends State<FuelTracker> {
         ],
       ),
     );
+  }
+}
+
+enum _NavAnimation {
+  /// Full turn, used for the settings gear.
+  spin,
+
+  /// Drives off to the right and comes back in from the left.
+  drive,
+
+  /// Flips over vertically like a page.
+  flip,
+}
+
+/// Nav bar icon that plays its animation each time it gets selected.
+class _NavIcon extends StatefulWidget {
+  final bool selected;
+  final _NavAnimation animation;
+  final Widget child;
+
+  const _NavIcon({
+    required this.selected,
+    required this.animation,
+    required this.child,
+  });
+
+  @override
+  State<_NavIcon> createState() => _NavIconState();
+}
+
+class _NavIconState extends State<_NavIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  );
+
+  @override
+  void didUpdateWidget(_NavIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected && !oldWidget.selected) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final t = _controller.value;
+        return switch (widget.animation) {
+          _NavAnimation.spin => Transform.rotate(
+            angle: Curves.easeInOut.transform(t) * 2 * pi,
+            child: child,
+          ),
+          _NavAnimation.drive => ClipRect(
+            child: FractionalTranslation(
+              translation: Offset(_driveOffset(t), 0),
+              child: child,
+            ),
+          ),
+          _NavAnimation.flip => Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.003)
+              ..rotateX(Curves.easeInOut.transform(t) * 2 * pi),
+            child: child,
+          ),
+        };
+      },
+    );
+  }
+
+  /// Horizontal offset in icon widths: speeds off to the right, then rolls
+  /// back in from the left and settles.
+  static double _driveOffset(double t) {
+    const leaveEnd = 0.4;
+    if (t < leaveEnd) {
+      return Curves.easeIn.transform(t / leaveEnd) * 1.2;
+    }
+    final back = Curves.easeOutBack.transform((t - leaveEnd) / (1 - leaveEnd));
+    return -1.2 * (1 - back);
   }
 }
