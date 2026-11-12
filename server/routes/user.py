@@ -44,6 +44,7 @@ class CarOut(BaseModel):
 
 class UserOut(BaseModel):
     id: int | None = None
+    name: str | None = None
     is_superuser: bool
     shared_cars: list[CarOut] 
     owned_cars: list[CarOut] 

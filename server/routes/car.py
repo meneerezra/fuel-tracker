@@ -139,9 +139,72 @@ def delete_car(
     if user is None:
         raise HTTPException(401, "Access denied")
     db_car = database.get_car_by_id(car.id)
-    if db_car not in user.owned_cars:
-        raise HTTPException(401, "Access denied")
     if not db_car:
         raise HTTPException(404, "Car does not exist")
+    if not _owns(user, db_car):
+        raise HTTPException(401, "Access denied")
 
     database.delete_car(db_car)
+
+class SharedUser(BaseModel):
+    id: int
+    name: str | None = None
+
+@router.get("/{car_id}/shares")
+def get_shares(
+        car_id: int,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> list[SharedUser]:
+    user = database.get_current_user(credentials)
+    if user is None:
+        raise HTTPException(401, "Access denied")
+    car = database.get_car_by_id(car_id)
+    if not car:
+        raise HTTPException(404, "Car does not exist")
+    if not _owns(user, car):
+        raise HTTPException(401, "Access denied")
+
+    return [SharedUser(id=shared.id, name=shared.name) for shared in database.get_shared_users(car_id) if shared.id is not None]
+
+class ShareCar(BaseModel):
+    user_id: int
+
+@router.post("/{car_id}/shares")
+def share_car(
+        car_id: int,
+        share: ShareCar,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ) -> list[SharedUser]:
+    user = database.get_current_user(credentials)
+    if user is None:
+        raise HTTPException(401, "Access denied")
+    car = database.get_car_by_id(car_id)
+    if not car:
+        raise HTTPException(404, "Car does not exist")
+    if not _owns(user, car):
+        raise HTTPException(401, "Access denied")
+    if share.user_id == user.id:
+        raise HTTPException(400, "You already own this car")
+    if database.get_user_by_id(share.user_id) is None:
+        raise HTTPException(404, "User does not exist")
+
+    database.share_car(car_id, share.user_id)
+    return get_shares(car_id, credentials)
+
+@router.delete("/{car_id}/shares/{user_id}")
+def unshare_car(
+        car_id: int,
+        user_id: int,
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+    ):
+    """The owner can remove anyone. A shared user can remove themselves."""
+    user = database.get_current_user(credentials)
+    if user is None:
+        raise HTTPException(401, "Access denied")
+    car = database.get_car_by_id(car_id)
+    if not car:
+        raise HTTPException(404, "Car does not exist")
+    if not _owns(user, car) and user.id != user_id:
+        raise HTTPException(401, "Access denied")
+
+    database.unshare_car(car_id, user_id)

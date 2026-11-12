@@ -95,18 +95,21 @@ class CarPrice {
 class User {
   const User({
     required this.id,
+    this.name,
     required this.isSuperuser,
     required this.sharedCars,
     required this.ownedCars,
   });
 
   final int id;
+  final String? name;
   final bool isSuperuser;
   final List<Car> sharedCars;
   final List<Car> ownedCars;
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: (json['id'] as num).toInt(),
+    name: json['name'] as String?,
     isSuperuser: json['is_superuser'] as bool,
     sharedCars: _carsFromJson(json['shared_cars']),
     ownedCars: _carsFromJson(json['owned_cars']),
@@ -115,6 +118,24 @@ class User {
   static List<Car> _carsFromJson(Object? json) {
     return (json as List<dynamic>)
         .map((car) => Car.fromJson(car as Map<String, dynamic>))
+        .toList();
+  }
+}
+
+class SharedUser {
+  const SharedUser({required this.id, this.name});
+
+  final int id;
+  final String? name;
+
+  factory SharedUser.fromJson(Map<String, dynamic> json) => SharedUser(
+    id: (json['id'] as num).toInt(),
+    name: json['name'] as String?,
+  );
+
+  static List<SharedUser> listFromJson(String body) {
+    return (jsonDecode(body) as List<dynamic>)
+        .map((user) => SharedUser.fromJson(user as Map<String, dynamic>))
         .toList();
   }
 }
@@ -248,6 +269,34 @@ class Api {
     );
     _ensureOk(response);
     return CarPrice.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<List<SharedUser>> getShares(int carId) async {
+    final response = await http.get(
+      _uri('/cars/$carId/shares'),
+      headers: _headers,
+    );
+    _ensureOk(response);
+    return SharedUser.listFromJson(response.body);
+  }
+
+  Future<List<SharedUser>> shareCar(int carId, int userId) async {
+    final response = await http.post(
+      _uri('/cars/$carId/shares'),
+      headers: _headers,
+      body: jsonEncode({'user_id': userId}),
+    );
+    _ensureOk(response);
+    return SharedUser.listFromJson(response.body);
+  }
+
+  /// The owner can remove anyone. A shared user can remove themselves.
+  Future<void> unshareCar(int carId, int userId) async {
+    final response = await http.delete(
+      _uri('/cars/$carId/shares/$userId'),
+      headers: _headers,
+    );
+    _ensureOk(response);
   }
 
   Future<List<Car>> ownedCars() async {

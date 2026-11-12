@@ -112,6 +112,8 @@ class _HomePageState extends State<HomePage> {
       storage: widget.storage,
       authStorage: widget.authStorage,
       isOwner: car.ownerId == user!.id,
+      userId: user.id,
+      onRemoved: _load,
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/secure_storage.dart';
+import 'package:fuel_tracker/share_car_page.dart';
 import 'package:fuel_tracker/storage_service.dart';
 
 class CarPage extends StatefulWidget {
@@ -15,12 +16,20 @@ class CarPage extends StatefulWidget {
   /// can still log km.
   final bool isOwner;
 
+  /// The logged in user, needed to leave a shared car.
+  final int? userId;
+
+  /// Called after the car is deleted or left. Pops the page when not set.
+  final VoidCallback? onRemoved;
+
   const CarPage({
     super.key,
     required this.car,
     required this.storage,
     required this.authStorage,
     this.isOwner = true,
+    this.userId,
+    this.onRemoved,
   });
 
   @override
@@ -104,6 +113,61 @@ class _CarPageState extends State<CarPage> {
       return false;
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Deletes the car when owned, otherwise stops sharing it with this user.
+  Future<void> _remove() async {
+    final isOwner = widget.isOwner;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isOwner ? 'Delete ${_car.name}?' : 'Leave ${_car.name}?'),
+        content: Text(
+          isOwner
+              ? 'The car and its km are removed for everyone it is shared with. '
+                    'This cannot be undone.'
+              : 'The car is removed from your list. The owner can share it '
+                    'with you again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(isOwner ? 'Delete' : 'Leave'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _saving = true);
+    try {
+      final api = await _api();
+      if (isOwner) {
+        await api.deleteCar(_car.id!);
+      } else {
+        await api.unshareCar(_car.id!, widget.userId!);
+      }
+      if (!mounted) return;
+      final onRemoved = widget.onRemoved;
+      if (onRemoved != null) {
+        onRemoved();
+      } else {
+        Navigator.pop(context);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -361,6 +425,36 @@ class _CarPageState extends State<CarPage> {
               value: _car.countryCode,
               onTap: _saving || !widget.isOwner ? null : _editCountry,
             ),
+            const Divider(height: 1),
+            if (widget.isOwner)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.share_outlined),
+                title: Text('Share', style: theme.textTheme.titleMedium),
+                subtitle: const Text('Let others view this car and log km'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ShareCarPage(
+                      car: _car,
+                      storage: widget.storage,
+                      authStorage: widget.authStorage,
+                    ),
+                  ),
+                ),
+              ),
+            if (widget.isOwner || widget.userId != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                iconColor: scheme.error,
+                textColor: scheme.error,
+                leading: Icon(
+                  widget.isOwner ? Icons.delete_outline : Icons.logout,
+                ),
+                title: Text(widget.isOwner ? 'Delete car' : 'Leave car'),
+                onTap: _saving ? null : _remove,
+              ),
             const SizedBox(height: 24),
           ],
         ),

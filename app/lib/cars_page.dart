@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fuel_tracker/add_car_page.dart';
 import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/car_page.dart';
 import 'package:fuel_tracker/home_page.dart';
@@ -48,7 +49,24 @@ class _CarsPageState extends State<CarsPage> {
     await future.then((_) {}, onError: (_) {});
   }
 
-  Future<void> _openCar(Car car, {required bool isOwner}) async {
+  Future<void> _addCar() async {
+    final car = await Navigator.push<Car>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddCarPage(
+          storage: widget.storage,
+          authStorage: widget.authStorage,
+        ),
+      ),
+    );
+    if (car != null && mounted) _refresh();
+  }
+
+  Future<void> _openCar(
+    Car car, {
+    required bool isOwner,
+    required int userId,
+  }) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -57,6 +75,7 @@ class _CarsPageState extends State<CarsPage> {
           storage: widget.storage,
           authStorage: widget.authStorage,
           isOwner: isOwner,
+          userId: userId,
         ),
       ),
     );
@@ -67,6 +86,11 @@ class _CarsPageState extends State<CarsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addCar,
+        icon: const Icon(Icons.add),
+        label: const Text('Add car'),
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refresh,
@@ -95,6 +119,8 @@ class _CarsPageState extends State<CarsPage> {
               )?.id;
 
               return ListView(
+                // Room for the add button.
+                padding: const EdgeInsets.only(bottom: 88),
                 children: [
                   _SectionHeader('Owned'),
                   if (user.ownedCars.isEmpty)
@@ -103,7 +129,8 @@ class _CarsPageState extends State<CarsPage> {
                     _CarTile(
                       car: car,
                       isCurrent: car.id == currentCarId,
-                      onTap: () => _openCar(car, isOwner: true),
+                      onTap: () =>
+                          _openCar(car, isOwner: true, userId: user.id),
                       onFavorite: () => widget.onCurrentCarChanged(car.id!),
                     ),
                   _SectionHeader('Shared with me'),
@@ -113,7 +140,8 @@ class _CarsPageState extends State<CarsPage> {
                     _CarTile(
                       car: car,
                       isCurrent: car.id == currentCarId,
-                      onTap: () => _openCar(car, isOwner: false),
+                      onTap: () =>
+                          _openCar(car, isOwner: false, userId: user.id),
                       onFavorite: () => widget.onCurrentCarChanged(car.id!),
                     ),
                 ],

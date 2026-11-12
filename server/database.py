@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 
 from models.car import Car
 from models.user import User, create_user_with_sixteen_digit_auth_token
+from models.user_car_link import UserCarLink
 import logging
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,32 @@ def delete_car(car: Car):
     with Session(engine) as session:
         session.delete(car)
         session.commit()
+
+def get_user_by_id(id: int) -> User | None:
+    with Session(engine) as session:
+        return session.get(User, id)
+
+def get_shared_users(car_id: int) -> list[User]:
+    with Session(engine) as session:
+        query = (
+            select(User).
+            join(UserCarLink, cast(InstrumentedAttribute, UserCarLink.user_id) == User.id).
+            where(UserCarLink.car_id == car_id)
+        )
+        return list(session.exec(query).all())
+
+def share_car(car_id: int, user_id: int):
+    with Session(engine) as session:
+        if session.get(UserCarLink, (user_id, car_id)) is None:
+            session.add(UserCarLink(user_id=user_id, car_id=car_id))
+            session.commit()
+
+def unshare_car(car_id: int, user_id: int):
+    with Session(engine) as session:
+        link = session.get(UserCarLink, (user_id, car_id))
+        if link is not None:
+            session.delete(link)
+            session.commit()
 
 def get_car_by_id(id: int) -> Car | None:
     with Session(engine) as session:
