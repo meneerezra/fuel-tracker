@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 import database
 from models.fuel_type import FuelType
+from models.validation import Name
 from models.user import User, create_user_with_sixteen_digit_auth_token
 import logging
 logger = logging.getLogger(__name__)
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 security = HTTPBearer()
 
 class CreateUser(BaseModel):
-    name: str
+    name: Name
     is_superuser: bool
 
 @router.post("/")
@@ -86,7 +87,7 @@ def _get_user_or_404(user_id: int) -> User:
     return user
 
 class RenameUser(BaseModel):
-    name: str
+    name: Name
 
 @router.put("/{user_id}", response_model=UserOut)
 def rename_user(
@@ -97,10 +98,7 @@ def rename_user(
     """Superuser only."""
     _require_superuser(credentials)
     user = _get_user_or_404(user_id)
-    name = body.name.strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Name cannot be empty")
-    user.name = name
+    user.name = body.name
     database.save_user(user)
     return database.get_user_with_cars(user_id)
 

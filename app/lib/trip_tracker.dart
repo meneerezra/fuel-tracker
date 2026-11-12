@@ -163,8 +163,11 @@ class TripTracker extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Shows up in `flutter run` and `adb logcat -s flutter`.
-  static void _log(String message) => debugPrint('[Trip] $message');
+  /// Shows up in `flutter run` and `adb logcat -s flutter`. Debug builds
+  /// only, the logs contain your location.
+  static void _log(String message) {
+    if (kDebugMode) debugPrint('[Trip] $message');
+  }
 
   LocationSettings _settings() {
     if (defaultTargetPlatform == TargetPlatform.android) {

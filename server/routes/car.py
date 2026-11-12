@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import database
 from models.car import Car
 from models.fuel_type import FuelType
+from models.validation import Consumption, CountryCode, Km, Name
 from services.fuel_prices import (
     CountryNotFoundError,
     FuelPriceServiceError,
@@ -23,6 +24,13 @@ def _can_use(user, car: Car) -> bool:
     """Owners and users the car is shared with can view it."""
     return _owns(user, car) or any(shared.id == car.id for shared in user.shared_cars)
 
+def _get_visible_car(user, car_id: int) -> Car:
+    """Returns 404 for cars the user cannot see, so car ids cannot be probed."""
+    car = database.get_car_by_id(car_id)
+    if not car or not _can_use(user, car):
+        raise HTTPException(404, "Car does not exist")
+    return car
+
 @router.get("/{car_id}")
 def get_car(
         car_id: int,
@@ -31,20 +39,14 @@ def get_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    car = database.get_car_by_id(car_id)
-    if not car:
-        raise HTTPException(404, "Car does not exist")
-    if not _can_use(user, car):
-        raise HTTPException(401, "Access denied")
-
-    return car
+    return _get_visible_car(user, car_id)
 
 class CreateCar(BaseModel):
-    name: str
-    km_threshold: float
+    name: Name
+    km_threshold: Km
     fuel_type: FuelType
-    consumption: float
-    country_code: str = "NL"
+    consumption: Consumption
+    country_code: CountryCode = "NL"
 
 @router.post("/")
 def create_car(
@@ -71,11 +73,7 @@ def get_price(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    car = database.get_car_by_id(car_id)
-    if not car:
-        raise HTTPException(404, "Car does not exist")
-    if not _can_use(user, car):
-        raise HTTPException(401, "Access denied")
+    car = _get_visible_car(user, car_id)
     try:
         history = fetch_country_history(car.country_code)
     except InvalidCountryCodeError:
@@ -94,13 +92,13 @@ def get_price(
 
 class EditCar(BaseModel):
     id: int
-    name: str
-    km_threshold: float
-    km_driven: float
-    total_km_driven: float
-    consumption: float
+    name: Name
+    km_threshold: Km
+    km_driven: Km
+    total_km_driven: Km
+    consumption: Consumption
     fuel_type: FuelType
-    country_code: str = "NL"
+    country_code: CountryCode = "NL"
 
 @router.put("/")
 def edit_car(
@@ -110,9 +108,7 @@ def edit_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    db_car = database.get_car_by_id(car.id)
-    if not db_car:
-        raise HTTPException(404, "Car does not exist")
+    db_car = _get_visible_car(user, car.id)
     # Users the car is shared with can only view it.
     if not _owns(user, db_car):
         raise HTTPException(401, "Access denied")
@@ -138,9 +134,7 @@ def delete_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    db_car = database.get_car_by_id(car.id)
-    if not db_car:
-        raise HTTPException(404, "Car does not exist")
+    db_car = _get_visible_car(user, car.id)
     if not _owns(user, db_car):
         raise HTTPException(401, "Access denied")
 
@@ -158,9 +152,7 @@ def get_shares(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    car = database.get_car_by_id(car_id)
-    if not car:
-        raise HTTPException(404, "Car does not exist")
+    car = _get_visible_car(user, car_id)
     if not _owns(user, car):
         raise HTTPException(401, "Access denied")
 
@@ -178,9 +170,7 @@ def share_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    car = database.get_car_by_id(car_id)
-    if not car:
-        raise HTTPException(404, "Car does not exist")
+    car = _get_visible_car(user, car_id)
     if not _owns(user, car):
         raise HTTPException(401, "Access denied")
     if share.user_id == car.owner_id:
@@ -201,9 +191,7 @@ def unshare_car(
     user = database.get_current_user(credentials)
     if user is None:
         raise HTTPException(401, "Access denied")
-    car = database.get_car_by_id(car_id)
-    if not car:
-        raise HTTPException(404, "Car does not exist")
+    car = _get_visible_car(user, car_id)
     if not _owns(user, car) and user.id != user_id:
         raise HTTPException(401, "Access denied")
 
