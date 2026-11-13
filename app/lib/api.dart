@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -61,6 +63,18 @@ class Car {
     countryCode: countryCode ?? this.countryCode,
   );
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'owner_id': ownerId,
+    'km_driven': kmDriven,
+    'km_treshold': kmTreshold,
+    'total_km_driven': totalKmDriven,
+    'consumption': consumption,
+    'fuel_type': fuelType.value,
+    'country_code': countryCode,
+  };
+
   factory Car.fromJson(Map<String, dynamic> json) => Car(
     id: (json['id'] as num?)?.toInt(),
     name: json['name'] as String,
@@ -84,6 +98,12 @@ class CarPrice {
   final double? fuelPrice;
   final double pricePerKm;
   final double pricePerThreshold;
+
+  Map<String, dynamic> toJson() => {
+    'fuel_price': fuelPrice,
+    'price_per_km': pricePerKm,
+    'price_per_threshold': pricePerThreshold,
+  };
 
   factory CarPrice.fromJson(Map<String, dynamic> json) => CarPrice(
     fuelPrice: (json['fuel_price'] as num?)?.toDouble(),
@@ -110,6 +130,23 @@ class User {
 
   /// Only sent when a user is created.
   final int? authToken;
+
+  User copyWith({List<Car>? sharedCars, List<Car>? ownedCars}) => User(
+    id: id,
+    name: name,
+    isSuperuser: isSuperuser,
+    sharedCars: sharedCars ?? this.sharedCars,
+    ownedCars: ownedCars ?? this.ownedCars,
+    authToken: authToken,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'is_superuser': isSuperuser,
+    'shared_cars': [for (final car in sharedCars) car.toJson()],
+    'owned_cars': [for (final car in ownedCars) car.toJson()],
+  };
 
   factory User.fromJson(Map<String, dynamic> json) => User(
     id: (json['id'] as num).toInt(),
@@ -156,6 +193,33 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// The server could not be reached, for example without network.
+class OfflineException extends ApiException {
+  OfflineException() : super('Cannot reach the server');
+}
+
+/// Turns network failures and timeouts into [OfflineException].
+class _Client extends http.BaseClient {
+  static const _timeout = Duration(seconds: 8);
+
+  final _inner = http.Client();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    try {
+      return await _inner.send(request).timeout(_timeout);
+    } on SocketException {
+      throw OfflineException();
+    } on TimeoutException {
+      throw OfflineException();
+    } on http.ClientException {
+      throw OfflineException();
+    }
+  }
+}
+
+final _client = _Client();
+
 class Api {
   Api({String? baseUrl, this.authToken})
     : baseUrl = _normalizeBaseUrl(baseUrl ?? _defaultBaseUrl);
@@ -184,7 +248,7 @@ class Api {
   };
 
   Future<User> login(int authToken) async {
-    final response = await http.get(
+    final response = await _client.get(
       _uri('/users/me'),
       headers: {
         'Content-Type': 'application/json',
@@ -200,7 +264,7 @@ class Api {
 
   /// All users with their cars. Superuser only.
   Future<List<User>> allUsers() async {
-    final response = await http.get(_uri('/users/'), headers: _headers);
+    final response = await _client.get(_uri('/users/'), headers: _headers);
     _ensureOk(response);
     return (jsonDecode(response.body) as List<dynamic>)
         .map((user) => User.fromJson(user as Map<String, dynamic>))
@@ -208,13 +272,13 @@ class Api {
   }
 
   Future<User> _getUser(String path) async {
-    final response = await http.get(_uri(path), headers: _headers);
+    final response = await _client.get(_uri(path), headers: _headers);
     _ensureOk(response);
     return User.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
   Future<Car> getCar(int carId) async {
-    final response = await http.get(_uri('/cars/$carId'), headers: _headers);
+    final response = await _client.get(_uri('/cars/$carId'), headers: _headers);
     _ensureOk(response);
     return Car.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
@@ -226,7 +290,7 @@ class Api {
     required double consumption,
     String countryCode = 'NL',
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       _uri('/cars/'),
       headers: _headers,
       body: jsonEncode({
@@ -251,7 +315,7 @@ class Api {
     required FuelType fuelType,
     String countryCode = 'NL',
   }) async {
-    final response = await http.put(
+    final response = await _client.put(
       _uri('/cars/'),
       headers: _headers,
       body: jsonEncode({
@@ -270,7 +334,7 @@ class Api {
   }
 
   Future<void> deleteCar(int id) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       _uri('/cars/'),
       headers: _headers,
       body: jsonEncode({'id': id}),
@@ -279,7 +343,7 @@ class Api {
   }
 
   Future<CarPrice> getPrice(int carId) async {
-    final response = await http.get(
+    final response = await _client.get(
       _uri('/cars/$carId/price'),
       headers: _headers,
     );
@@ -288,7 +352,7 @@ class Api {
   }
 
   Future<List<SharedUser>> getShares(int carId) async {
-    final response = await http.get(
+    final response = await _client.get(
       _uri('/cars/$carId/shares'),
       headers: _headers,
     );
@@ -297,7 +361,7 @@ class Api {
   }
 
   Future<List<SharedUser>> shareCar(int carId, int userId) async {
-    final response = await http.post(
+    final response = await _client.post(
       _uri('/cars/$carId/shares'),
       headers: _headers,
       body: jsonEncode({'user_id': userId}),
@@ -308,7 +372,7 @@ class Api {
 
   /// The owner can remove anyone. A shared user can remove themselves.
   Future<void> unshareCar(int carId, int userId) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       _uri('/cars/$carId/shares/$userId'),
       headers: _headers,
     );
@@ -322,7 +386,7 @@ class Api {
 
   /// Superuser only.
   Future<void> renameUser(int userId, String name) async {
-    final response = await http.put(
+    final response = await _client.put(
       _uri('/users/$userId'),
       headers: _headers,
       body: jsonEncode({'name': name}),
@@ -332,7 +396,7 @@ class Api {
 
   /// Superuser only.
   Future<int> userToken(int userId) async {
-    final response = await http.get(
+    final response = await _client.get(
       _uri('/users/$userId/token'),
       headers: _headers,
     );
@@ -343,7 +407,7 @@ class Api {
 
   /// Superuser only. Also deletes the cars the user owns.
   Future<void> deleteUser(int userId) async {
-    final response = await http.delete(
+    final response = await _client.delete(
       _uri('/users/$userId'),
       headers: _headers,
     );
@@ -354,7 +418,7 @@ class Api {
     required String name,
     required bool isSuperuser,
   }) async {
-    final response = await http.post(
+    final response = await _client.post(
       _uri('/users/'),
       headers: _headers,
       body: jsonEncode({'name': name, 'is_superuser': isSuperuser}),

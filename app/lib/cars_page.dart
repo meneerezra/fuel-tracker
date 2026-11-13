@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fuel_tracker/add_car_page.dart';
 import 'package:fuel_tracker/api.dart';
+import 'package:fuel_tracker/car_repository.dart';
 import 'package:fuel_tracker/car_page.dart';
 import 'package:fuel_tracker/home_page.dart';
 import 'package:fuel_tracker/search_field.dart';
@@ -59,12 +60,8 @@ class _CarsPageState extends State<CarsPage> {
     setState(() => _query = '');
   }
 
-  Future<User> _loadUser() async {
-    final token = await widget.authStorage.getAuthToken();
-    if (token == null) throw ApiException('Not logged in');
-    final api = Api(baseUrl: widget.storage.getServerUrl(), authToken: token);
-    return api.me();
-  }
+  // Falls back to the saved copy while offline.
+  Future<User> _loadUser() => CarRepository.instance.me();
 
   Future<void> _refresh() async {
     final future = _loadUser();

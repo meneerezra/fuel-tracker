@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fuel_tracker/api.dart';
+import 'package:fuel_tracker/car_repository.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/share_car_page.dart';
 import 'package:fuel_tracker/storage_service.dart';
@@ -59,21 +60,15 @@ class _CarPageState extends State<CarPage> {
     }
   }
 
-  Future<Api> _api() async {
-    final token = await widget.authStorage.getAuthToken();
-    if (token == null) throw ApiException('Not logged in');
-    return Api(baseUrl: widget.storage.getServerUrl(), authToken: token);
-  }
+  final _repository = CarRepository.instance;
 
-  Future<CarPrice> _loadPrice() async {
-    final api = await _api();
-    return api.getPrice(_car.id!);
-  }
+  Future<Api> _api() => _repository.api();
+
+  Future<CarPrice> _loadPrice() => _repository.getPrice(_car.id!);
 
   Future<void> _refresh() async {
     try {
-      final api = await _api();
-      final car = await api.getCar(_car.id!);
+      final car = await _repository.getCar(_car.id!);
       setState(() {
         _car = car;
         _price = _loadPrice();
@@ -86,10 +81,26 @@ class _CarPageState extends State<CarPage> {
     }
   }
 
-  /// Saves [car] to the server. Returns false when saving failed.
+  /// Saves a km change. Works offline, the change is synced later.
+  Future<bool> _saveKm(KmChange change) async {
+    final car = await _repository.changeKm(_car, change);
+    if (mounted) setState(() => _car = car);
+    return true;
+  }
+
+  /// Saves other changes to the server. Needs a connection. Returns false
+  /// when saving failed.
   Future<bool> _save(Car car) async {
     setState(() => _saving = true);
     try {
+      // The whole car is sent, so queued km changes must be on the server
+      // first or they would be counted twice.
+      await _repository.sync();
+      if (_repository.hasPending(car.id!)) {
+        throw ApiException(
+          'Km changes are still waiting to sync. Try again when online.',
+        );
+      }
       final api = await _api();
       final saved = await api.editCar(
         id: car.id!,
@@ -101,12 +112,21 @@ class _CarPageState extends State<CarPage> {
         fuelType: car.fuelType,
         countryCode: car.countryCode,
       );
+      await _repository.carSaved(saved);
       if (!mounted) return true;
       setState(() {
         _car = saved;
         _price = _loadPrice();
       });
       return true;
+    } on OfflineException {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Offline. Only km changes can be saved offline.'),
+        ),
+      );
+      return false;
     } catch (error) {
       if (!mounted) return false;
       ScaffoldMessenger.of(context)
@@ -154,7 +174,7 @@ class _CarPageState extends State<CarPage> {
     );
     if (confirmed != true) return;
 
-    final paid = await _save(_car.copyWith(kmDriven: 0));
+    final paid = await _saveKm(KmChange.resetTrip(widget.userId, _car.id!));
     if (!paid || !mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -222,14 +242,8 @@ class _CarPageState extends State<CarPage> {
     }
   }
 
-  Future<bool> _addKm(double km) {
-    return _save(
-      _car.copyWith(
-        kmDriven: _car.kmDriven + km,
-        totalKmDriven: _car.totalKmDriven + km,
-      ),
-    );
-  }
+  Future<bool> _addKm(double km) =>
+      _saveKm(KmChange.add(widget.userId, _car.id!, km));
 
   Future<void> _editName() async {
     final name = await _showTextDialog(
@@ -409,7 +423,11 @@ class _CarPageState extends State<CarPage> {
                         suffix: 'km',
                         decimals: 1,
                       );
-                      if (km != null) await _save(_car.copyWith(kmDriven: km));
+                      if (km != null) {
+                        await _saveKm(
+                          KmChange.setTrip(widget.userId, _car.id!, km),
+                        );
+                      }
                     },
             ),
             _InfoTile(
@@ -427,7 +445,9 @@ class _CarPageState extends State<CarPage> {
                         decimals: 1,
                       );
                       if (km != null) {
-                        await _save(_car.copyWith(totalKmDriven: km));
+                        await _saveKm(
+                          KmChange.setOdometer(widget.userId, _car.id!, km),
+                        );
                       }
                     },
             ),

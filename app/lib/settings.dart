@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fuel_tracker/api.dart';
+import 'package:fuel_tracker/car_repository.dart';
 import 'package:fuel_tracker/authentication.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/server_settings_page.dart';
@@ -101,12 +102,7 @@ class _AccountSection extends StatefulWidget {
 class _AccountSectionState extends State<_AccountSection> {
   late Future<User> _user = _load();
 
-  Future<User> _load() async {
-    final token = await widget.authStorage.getAuthToken();
-    if (token == null) throw ApiException('Not logged in');
-    final api = Api(baseUrl: widget.storage.getServerUrl(), authToken: token);
-    return api.me();
-  }
+  Future<User> _load() => CarRepository.instance.me();
 
   @override
   Widget build(BuildContext context) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:fuel_tracker/car_repository.dart';
 import 'package:fuel_tracker/api.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
@@ -62,8 +63,14 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
       return;
     }
 
+    final oldToken = await widget.authStorage.getAuthToken();
+    final oldUrl = widget.storage.getServerUrl();
     await widget.authStorage.saveToken(newToken);
     await widget.storage.saveServerUrl(newUrl);
+    // The saved offline copy belongs to the old account or server.
+    if (oldToken != newToken || (oldUrl ?? '') != newUrl) {
+      await CarRepository.instance.clearCache();
+    }
   }
 
   @override

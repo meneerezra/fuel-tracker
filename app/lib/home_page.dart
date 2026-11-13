@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fuel_tracker/api.dart';
+import 'package:fuel_tracker/car_repository.dart';
 import 'package:fuel_tracker/car_page.dart';
 import 'package:fuel_tracker/secure_storage.dart';
 import 'package:fuel_tracker/storage_service.dart';
@@ -56,10 +57,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _load() async {
     try {
-      final token = await widget.authStorage.getAuthToken();
-      if (token == null) throw ApiException('Not logged in');
-      final api = Api(baseUrl: widget.storage.getServerUrl(), authToken: token);
-      final user = await api.me();
+      // Falls back to the saved copy while offline.
+      final user = await CarRepository.instance.me();
       if (!mounted) return;
       setState(() {
         _user = user;

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fuel_tracker/car_repository.dart';
 import 'package:fuel_tracker/cars_page.dart';
 import 'package:fuel_tracker/home_page.dart';
 import 'package:fuel_tracker/secure_storage.dart';
@@ -16,6 +17,7 @@ Future<void> main() async {
   final storage = StorageService(prefs);
   const secureStorage = FlutterSecureStorage();
   final authStorage = AuthStorage(secureStorage);
+  CarRepository.init(storage, authStorage);
   runApp(FuelTrackerApp(storage: storage, authStorage: authStorage));
 }
 
@@ -145,7 +147,14 @@ class _FuelTrackerState extends State<FuelTracker> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: currentIndex, children: pages),
+      body: Column(
+        children: [
+          Expanded(
+            child: IndexedStack(index: currentIndex, children: pages),
+          ),
+          const _SyncBanner(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (index) {
@@ -283,5 +292,89 @@ class _NavIconState extends State<_NavIcon>
     }
     final back = Curves.easeOutBack.transform((t - leaveEnd) / (1 - leaveEnd));
     return -1.2 * (1 - back);
+  }
+}
+
+/// Shows when the server cannot be reached or km changes wait to sync.
+class _SyncBanner extends StatelessWidget {
+  const _SyncBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = CarRepository.instance;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ListenableBuilder(
+      listenable: repository,
+      builder: (context, _) {
+        final pending = repository.pendingCount;
+        final visible = repository.isOffline || pending > 0;
+        final waiting = pending == 1
+            ? '1 km change waiting to sync'
+            : '$pending km changes waiting to sync';
+        final text = repository.isOffline
+            ? pending > 0
+                  ? 'Offline · $waiting'
+                  : 'Offline · showing saved data'
+            : repository.isSyncing
+            ? 'Syncing km changes...'
+            : waiting;
+
+        return AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          child: !visible
+              ? const SizedBox(width: double.infinity)
+              : Material(
+                  color: repository.isOffline
+                      ? scheme.errorContainer
+                      : scheme.secondaryContainer,
+                  child: InkWell(
+                    // Retry now instead of waiting for the next attempt.
+                    onTap: repository.retry,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            repository.isOffline
+                                ? Icons.cloud_off
+                                : Icons.cloud_sync_outlined,
+                            size: 18,
+                            color: repository.isOffline
+                                ? scheme.onErrorContainer
+                                : scheme.onSecondaryContainer,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              text,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: repository.isOffline
+                                    ? scheme.onErrorContainer
+                                    : scheme.onSecondaryContainer,
+                              ),
+                            ),
+                          ),
+                          if (!repository.isSyncing)
+                            Text(
+                              'Retry',
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: repository.isOffline
+                                    ? scheme.onErrorContainer
+                                    : scheme.onSecondaryContainer,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+        );
+      },
+    );
   }
 }

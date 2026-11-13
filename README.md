@@ -129,6 +129,11 @@ On a car you own, tap **Start** to measure a trip with GPS. Tracking keeps runni
 - The trip is kept in memory. It is lost when Android closes the app.
 - In debug builds every GPS fix is logged with a `[Trip]` prefix (`adb logcat -s flutter`).
 
+### Offline
+The app keeps a copy of your account, cars and prices on the phone. When the server cannot be reached it shows that copy, with a banner at the bottom.
+
+Km changes (the counter, GPS trips, **Paid**, and editing Trip or Odometer) also work offline. They are saved on the phone and sent to the server in order when it can be reached again, applied on top of the latest server values. The app retries every 30 seconds, or tap the banner to retry now. Other changes, like the name or sharing, need a connection.
+
 ## Security
 - The app talks to the server over plain HTTP (`usesCleartextTraffic`), so the auth token is sent unencrypted. This is fine on a home network. Put the server behind HTTPS before exposing it to the internet.
 - Auth tokens are stored unencrypted in `database.db`, so superusers can view them. Keep this file private.
